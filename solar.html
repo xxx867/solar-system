@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Солнечная система — управление жестами</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #hud {
+            position: absolute; top: 20px; left: 20px;
+            background: rgba(0,0,0,0.8); border-left: 3px solid #0f0;
+            padding: 10px 15px; color: #0f0; font-size: 14px;
+            z-index: 100; pointer-events: none; backdrop-filter: blur(4px);
+            border-radius: 0 8px 8px 0;
+        }
+        #controls {
+            position: absolute; bottom: 100px; left: 20px;
+            background: rgba(0,0,0,0.6); padding: 5px 12px;
+            color: #ffaa66; font-size: 12px; border-radius: 20px;
+            z-index: 100; pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+        .buttons {
+            position: absolute; bottom: 20px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 8px;
+            flex-wrap: wrap; z-index: 200; padding: 10px;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+        }
+        button {
+            background: rgba(0,0,0,0.7); border: 1px solid #0f0;
+            color: #0f0; padding: 6px 12px; font-family: monospace;
+            font-size: 12px; cursor: pointer; border-radius: 6px;
+            transition: 0.2s;
+        }
+        button:hover { background: #0f0; color: #000; }
+        #fullscreen-btn {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.6); border: 1px solid #0f0;
+            color: #0f0; padding: 6px 12px; cursor: pointer;
+            z-index: 200; font-family: monospace;
+            border-radius: 6px;
+        }
+        #control-mode {
+            position: absolute; top: 80px; right: 20px;
+            background: rgba(0,0,0,0.7); border: 1px solid #0f0;
+            color: #0f0; padding: 6px 12px;
+            font-family: monospace; font-size: 12px;
+            border-radius: 6px; cursor: pointer;
+            z-index: 200;
+        }
+        .hud-value { color: #ffaa44; }
+        .gesture-value { color: #88ff88; }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        🎯 ЦЕЛЬ: <span id="target-name" class="hud-value">СОЛНЦЕ</span><br>
+        ✋ РУКА: <span id="hand-status">ПОИСК...</span><br>
+        🕹️ РЕЖИМ: <span id="mode-indicator" class="hud-value">ЖЕСТЫ</span><br>
+        🌌 ВИДИМОСТЬ: <span id="visible-indicator" class="hud-value">ДА</span><br>
+        🤚 ЖЕСТ: <span id="gesture-name" class="gesture-value">—</span>
+    </div>
+    <div id="controls">
+        🖐️ РАСКРЫТАЯ ЛАДОНЬ → ПОКАЗАТЬ &nbsp;| ✊ КУЛАК → СКРЫТЬ &nbsp;| ☝️ ПАЛЕЦ ВЛЕВО/ВПРАВО → ПРЕД./СЛЕД. ПЛАНЕТА
+    </div>
+    <div class="buttons" id="planet-buttons"></div>
+    <button id="fullscreen-btn">⛶ ПОЛНЫЙ ЭКРАН</button>
+    <button id="control-mode">🔘 ПЕРЕКЛЮЧИТЬ УПРАВЛЕНИЕ (МЫШЬ/ЖЕСТЫ)</button>
+
+    <video id="video-input" style="display:none"></video>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+    <script>
+        // ---------- ПЛАНЕТЫ ----------
+        const planetsData = [
+            { name: "СОЛНЦЕ", radius: 12, distance: 0, color: [0xffaa44, 0xff6644], particles: 20000, isSun: true, speed: 0 },
+            { name: "МЕРКУРИЙ", radius: 1.8, distance: 18, color: [0xaa8866], particles: 3000, speed: 0.006 },
+            { name: "ВЕНЕРА", radius: 2.2, distance: 25, color: [0xdd9988], particles: 4000, speed: 0.0045 },
+            { name: "ЗЕМЛЯ", radius: 2.5, distance: 32, color: [0x3388ff, 0x44cc44], particles: 12000, speed: 0.0035 },
+            { name: "МАРС", radius: 2.0, distance: 39, color: [0xcc6644], particles: 4000, speed: 0.003 },
+            { name: "ЮПИТЕР", radius: 5.5, distance: 52, color: [0xd2b48c], particles: 15000, speed: 0.002 },
+            { name: "САТУРН", radius: 4.8, distance: 68, color: [0xd2b48c, 0xc2b280], particles: 18000, speed: 0.0015, hasRings: true },
+            { name: "УРАН", radius: 3.5, distance: 82, color: [0x88ccff], particles: 8000, speed: 0.0012 },
+            { name: "НЕПТУН", radius: 3.5, distance: 96, color: [0x3366aa], particles: 8000, speed: 0.001 }
+        ];
+        const planetNames = ["СОЛНЦЕ","МЕРКУРИЙ","ВЕНЕРА","ЗЕМЛЯ","МАРС","ЮПИТЕР","САТУРН","УРАН","НЕПТУН"];
+        
+        let scene, camera, renderer;
+        let planets = {};
+        let moonParticles = null;
+        let starField = null;
+        let targetPositions = {};
+        let currentTargetIdx = 0;
+        let currentTarget = planetNames[0];
+        
+        let cameraDistance = 55;
+        let targetDistance = 55;
+        let cameraPhi = 0, cameraTheta = 0.6;
+        
+        let controlMode = "gesture";
+        let mouseLeftDown = false;
+        let lastMouseX = 0, lastMouseY = 0;
+        let mouseRotSpeed = { x: 0, y: 0 };
+        let targetRot = { x: 0, y: 0 };
+        let currentRot = { x: 0, y: 0 };
+        let pinch = 0, targetPinch = 0;
+        
+        let systemVisible = true;
+        let targetOpacity = 1.0;
+        let currentOpacity = 1.0;
+        let allObjects = [];      // все объекты (планеты, луна, звёзды) для управления видимостью
+        
+        let moonAngle = 0;
+        const moonOrbitRadius = 6;
+        let moonSpeed = 0.025;
+        
+        let isSwitching = false;
+        let switchTimer = 0;
+        const switchDuration = 1.5;
+        let startCamPos = new THREE.Vector3();
+        let endTargetPos = new THREE.Vector3();
+        let startDist = cameraDistance;
+        let startPhi = cameraPhi, startTheta = cameraTheta;
+        
+        let lastGestureTime = 0;
+        let lastDetectedGesture = "none";
+        let lastPointingDirection = null;
+        
+        // ---------- ПЕРЕМЕННЫЕ ДЛЯ ЭФФЕКТА "КОНЕЦ ВСЕЛЕННОЙ" ----------
+        let universeEnded = false;               // активна ли анимация разрушения
+        let explosionProgress = 0;               // 0 -> 1 (сбор в центр), затем 2 (разлёт)
+        let explosionObjects = [];               // список {obj, startPos, targetPos, velocity}
+        let explosionDuration = 2.0;             // секунды на сбор
+        let explosionTimer = 0;
+        
+        // ---------- ЖЕСТЫ (ОДНА РУКА) ----------
+        function detectOpenPalmAndFist(landmarks) {
+            const wrist = landmarks[0];
+            const tips = [4, 8, 12, 16, 20];
+            let avgDist = 0;
+            let extendedCount = 0;
+            for (let tip of tips) {
+                const dx = landmarks[tip].x - wrist.x;
+                const dy = landmarks[tip].y - wrist.y;
+                const dist = Math.hypot(dx, dy);
+                avgDist += dist;
+                if (dist > 0.22) extendedCount++;
+            }
+            avgDist /= tips.length;
+            if (extendedCount >= 4 && avgDist > 0.28) return "open";
+            if (extendedCount <= 1 && avgDist < 0.18) return "fist";
+            return "unknown";
+        }
+        
+        function detectPointingDirection(landmarks) {
+            const indexTip = landmarks[8];
+            const indexBase = landmarks[5];
+            const dx = indexTip.x - indexBase.x;
+            if (Math.abs(dx) < 0.03) return null;
+            if (dx < -0.05) return "left";
+            if (dx > 0.05) return "right";
+            return null;
+        }
+        
+        function nextPlanet() {
+            if (universeEnded) return;
+            const nextIdx = (currentTargetIdx + 1) % planetNames.length;
+            setTarget(planetNames[nextIdx]);
+            document.getElementById('gesture-name').innerHTML = "👉 ВПРАВО";
+            setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "👉 ВПРАВО") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 600);
+        }
+        
+        function prevPlanet() {
+            if (universeEnded) return;
+            const prevIdx = (currentTargetIdx - 1 + planetNames.length) % planetNames.length;
+            setTarget(planetNames[prevIdx]);
+            document.getElementById('gesture-name').innerHTML = "👈 ВЛЕВО";
+            setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "👈 ВЛЕВО") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 600);
+        }
+        
+        // ---------- 3D ОБЪЕКТЫ ----------
+        function isOnContinent(lat, lon) {
+            if (lat > 25 && lat < 75 && ((lon > -20 && lon < 60) || (lon > 60 && lon < 140))) return true;
+            if (lat > -35 && lat < 35 && lon > -20 && lon < 50) return true;
+            if (lat > 15 && lat < 65 && lon > -170 && lon < -60) return true;
+            if (lat > -55 && lat < 15 && lon > -80 && lon < -35) return true;
+            if (lat > -40 && lat < -10 && lon > 110 && lon < 155) return true;
+            return false;
+        }
+        
+        function createPlanet(data) {
+            const count = data.particles;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const radius = data.radius;
+            const isEarth = (data.name === "ЗЕМЛЯ");
+            const isSaturn = (data.name === "САТУРН");
+            for (let i = 0; i < count; i++) {
+                let x, y, z;
+                if (isSaturn && Math.random() < 0.4) {
+                    const ringRad = radius * 1.8 + Math.random() * radius * 1.2;
+                    const angleRing = Math.random() * Math.PI * 2;
+                    x = ringRad * Math.cos(angleRing);
+                    z = ringRad * Math.sin(angleRing);
+                    y = (Math.random() - 0.5) * 0.8;
+                } else {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const rad = radius * (0.85 + Math.random() * 0.3);
+                    x = rad * Math.sin(phi) * Math.cos(theta);
+                    y = rad * Math.sin(phi) * Math.sin(theta);
+                    z = rad * Math.cos(phi);
+                }
+                positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
+                let col;
+                if (isEarth) {
+                    const theta2 = Math.atan2(y, x);
+                    const phi2 = Math.acos(z / Math.hypot(x, y, z));
+                    const lat = (Math.PI/2 - phi2) * 180 / Math.PI;
+                    let lon = theta2 * 180 / Math.PI;
+                    if (lon > 180) lon -= 360;
+                    col = isOnContinent(lat, lon) ? new THREE.Color(0x44cc44) : new THREE.Color(0x3388ff);
+                } else if (data.isSun) {
+                    const mix = Math.random();
+                    col = new THREE.Color().setHSL(0.12, 1.0, 0.5 + mix * 0.3);
+                } else {
+                    col = new THREE.Color(data.color[0]);
+                    if (data.color.length > 1 && Math.random() < 0.3) col = new THREE.Color(data.color[1]);
+                }
+                colors[i*3] = col.r; colors[i*3+1] = col.g; colors[i*3+2] = col.b;
+            }
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const material = new THREE.PointsMaterial({ size: 0.4, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true });
+            const planet = new THREE.Points(geom, material);
+            scene.add(planet);
+            planets[data.name] = planet;
+            const angle = Math.random() * Math.PI * 2;
+            const x = Math.cos(angle) * data.distance;
+            const z = Math.sin(angle) * data.distance;
+            planet.position.set(x, 0, z);
+            targetPositions[data.name] = new THREE.Vector3(x, 0, z);
+            planet.userData = { distance: data.distance, speed: data.speed, angle: angle };
+            allObjects.push(planet);
+            return planet;
+        }
+        
+        function createMoon() {
+            const count = 4000;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const radius = 1.8;
+            for (let i = 0; i < count; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const rad = radius * (0.8 + Math.random() * 0.4);
+                const x = rad * Math.sin(phi) * Math.cos(theta);
+                const y = rad * Math.sin(phi) * Math.sin(theta);
+                const z = rad * Math.cos(phi);
+                positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
+                const col = new THREE.Color(0xdddddd);
+                colors[i*3] = col.r; colors[i*3+1] = col.g; colors[i*3+2] = col.b;
+            }
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const material = new THREE.PointsMaterial({ size: 0.3, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true });
+            const moon = new THREE.Points(geom, material);
+            scene.add(moon);
+            targetPositions["ЛУНА"] = new THREE.Vector3(0, 0, 0);
+            allObjects.push(moon);
+            return moon;
+        }
+        
+        function createStars() {
+            const starCount = 6000;
+            const starPos = [];
+            for (let i = 0; i < starCount; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const r = 130 + Math.random() * 50;
+                starPos.push(r * Math.sin(phi) * Math.cos(theta));
+                starPos.push(r * Math.sin(phi) * Math.sin(theta));
+                starPos.push(r * Math.cos(phi));
+            }
+            const starGeo = new THREE.BufferGeometry();
+            starGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPos), 3));
+            const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, transparent: true });
+            const stars = new THREE.Points(starGeo, starMat);
+            scene.add(stars);
+            allObjects.push(stars);
+            return stars;
+        }
+        
+        // Обычное обновление орбит и луны (не используется, когда вселенная разрушена)
+        function updateOrbits() {
+            if (universeEnded) return;
+            for (let [name, planet] of Object.entries(planets)) {
+                if (name === "СОЛНЦЕ") continue;
+                const data = planet.userData;
+                data.angle += data.speed;
+                const x = Math.cos(data.angle) * data.distance;
+                const z = Math.sin(data.angle) * data.distance;
+                planet.position.set(x, 0, z);
+                targetPositions[name].set(x, 0, z);
+            }
+        }
+        
+        function updateMoon() {
+            if (universeEnded) return;
+            if (!planets["ЗЕМЛЯ"]) return;
+            const earthPos = planets["ЗЕМЛЯ"].position;
+            moonAngle += moonSpeed;
+            const x = earthPos.x + Math.cos(moonAngle) * moonOrbitRadius;
+            const z = earthPos.z + Math.sin(moonAngle) * moonOrbitRadius;
+            const y = earthPos.y;
+            moonParticles.position.set(x, y, z);
+            targetPositions["ЛУНА"].set(x, y, z);
+        }
+        
+        function setTarget(name) {
+            if (universeEnded) return;
+            if (isSwitching || !targetPositions[name]) return;
+            const idx = planetNames.indexOf(name);
+            if (idx !== -1) currentTargetIdx = idx;
+            startCamPos = camera.position.clone();
+            endTargetPos = targetPositions[name].clone();
+            startDist = cameraDistance;
+            startPhi = cameraPhi; startTheta = cameraTheta;
+            isSwitching = true;
+            switchTimer = 0;
+            window._pending = name;
+            document.getElementById('target-name').innerText = name;
+        }
+        
+        function updateSwitch(dt) {
+            if (!isSwitching) return;
+            switchTimer += dt;
+            let t = Math.min(1, switchTimer / switchDuration);
+            const ease = 1 - Math.pow(1 - t, 3);
+            const newPos = startCamPos.clone().lerp(endTargetPos.clone().add(new THREE.Vector3(0, 4, startDist)), ease);
+            camera.position.copy(newPos);
+            cameraPhi = startPhi * (1 - ease);
+            cameraTheta = startTheta * (1 - ease) + 0.6 * ease;
+            camera.lookAt(endTargetPos);
+            cameraDistance = startDist;
+            if (t >= 1) {
+                isSwitching = false;
+                currentTarget = window._pending;
+                currentRot.x = 0; currentRot.y = 0;
+                targetRot.x = 0; targetRot.y = 0;
+                mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
+            }
+        }
+        
+        function updateCamera(dt) {
+            if (isSwitching) return;
+            if (controlMode === "gesture" && !universeEnded) {
+                const sens = 2.5;
+                currentRot.x += (targetRot.x * sens - currentRot.x) * 0.2;
+                currentRot.y += (targetRot.y * sens - currentRot.y) * 0.2;
+                cameraPhi += currentRot.x * dt * 1.5;
+                cameraTheta += currentRot.y * dt * 1.2;
+                pinch += (targetPinch - pinch) * 0.2;
+                cameraDistance += (targetDistance - cameraDistance) * 0.12;
+            } else if (controlMode === "mouse") {
+                cameraPhi += mouseRotSpeed.x * dt * 1.8;
+                cameraTheta += mouseRotSpeed.y * dt * 1.5;
+                mouseRotSpeed.x *= 0.95;
+                mouseRotSpeed.y *= 0.95;
+                cameraDistance += (targetDistance - cameraDistance) * 0.12;
+            }
+            cameraTheta = Math.max(0.05, Math.min(Math.PI - 0.05, cameraTheta));
+            cameraDistance = Math.min(Math.max(cameraDistance, 15), 80);
+            const x = Math.sin(cameraPhi) * Math.cos(cameraTheta) * cameraDistance;
+            const y = Math.sin(cameraTheta) * cameraDistance;
+            const z = Math.cos(cameraPhi) * Math.cos(cameraTheta) * cameraDistance;
+            const targetPos = targetPositions[currentTarget];
+            if (targetPos) {
+                camera.position.copy(targetPos.clone().add(new THREE.Vector3(x, y + 3, z)));
+                camera.lookAt(targetPos);
+            }
+        }
+        
+        function updateVisibility(dt) {
+            if (universeEnded) return;
+            const eps = 0.02;
+            if (Math.abs(currentOpacity - targetOpacity) > eps) {
+                currentOpacity += (targetOpacity - currentOpacity) * 0.15;
+            } else {
+                currentOpacity = targetOpacity;
+            }
+            for (let obj of allObjects) {
+                if (obj.material) obj.material.opacity = currentOpacity;
+            }
+            document.getElementById('visible-indicator').innerText = targetOpacity > 0.5 ? "ДА" : "НЕТ";
+        }
+        
+        function setSystemVisible(visible) {
+            if (universeEnded) return;
+            if (visible === systemVisible) return;
+            systemVisible = visible;
+            targetOpacity = visible ? 1.0 : 0.0;
+        }
+        
+        // ---------- ЭФФЕКТ "КОНЕЦ ВСЕЛЕННОЙ" ----------
+        function startUniverseEnd() {
+            if (universeEnded) return;
+            universeEnded = true;
+            explosionProgress = 0;
+            explosionTimer = 0;
+            // Собираем все частицы из всех объектов (планеты, луна, звёзды)
+            explosionObjects = [];
+            for (let obj of allObjects) {
+                if (obj.geometry && obj.geometry.attributes.position) {
+                    const posAttr = obj.geometry.attributes.position.array;
+                    const count = obj.geometry.attributes.position.count;
+                    for (let i = 0; i < count; i++) {
+                        const ix = i * 3;
+                        const startPos = new THREE.Vector3(posAttr[ix], posAttr[ix+1], posAttr[ix+2]);
+                        explosionObjects.push({
+                            obj: obj,
+                            index: i,
+                            startPos: startPos,
+                            targetPos: new THREE.Vector3(0, 0, 0), // центр
+                            velocity: null,
+                            done: false
+                        });
+                    }
+                }
+            }
+            // Также само Солнце (планета "СОЛНЦЕ") — его частицы тоже будут собраны
+            // Дополнительно скрываем HUD жестов, чтобы не мешать эффекту
+            document.getElementById('gesture-name').innerHTML = "💥 КОНЕЦ ВСЕЛЕННОЙ 💥";
+            // Отключаем обычное движение
+        }
+        
+        function updateExplosion(dt) {
+            if (!universeEnded) return;
+            explosionTimer += dt;
+            if (explosionProgress === 0) {
+                // Фаза 1: движение всех частиц к центру (0,0,0)
+                const t = Math.min(1, explosionTimer / explosionDuration);
+                for (let item of explosionObjects) {
+                    if (item.done) continue;
+                    const newPos = item.startPos.clone().lerp(item.targetPos, t);
+                    const posAttr = item.obj.geometry.attributes.position.array;
+                    posAttr[item.index*3] = newPos.x;
+                    posAttr[item.index*3+1] = newPos.y;
+                    posAttr[item.index*3+2] = newPos.z;
+                }
+                if (t >= 1) {
+                    explosionProgress = 1;
+                    explosionTimer = 0;
+                    // После сбора всех частиц в центр — взрыв: задаём случайные скорости для разлёта
+                    for (let item of explosionObjects) {
+                        const dir = new THREE.Vector3(
+                            (Math.random() - 0.5) * 2,
+                            (Math.random() - 0.5) * 2,
+                            (Math.random() - 0.5) * 2
+                        ).normalize();
+                        const speed = 20 + Math.random() * 30;
+                        item.velocity = dir.multiplyScalar(speed);
+                    }
+                }
+            } else if (explosionProgress === 1) {
+                // Фаза 2: разлёт частиц
+                const t = explosionTimer;
+                let allGone = true;
+                for (let item of explosionObjects) {
+                    if (item.done) continue;
+                    const posAttr = item.obj.geometry.attributes.position.array;
+                    const offset = item.velocity.clone().multiplyScalar(t);
+                    const newX = 0 + offset.x;
+                    const newY = 0 + offset.y;
+                    const newZ = 0 + offset.z;
+                    posAttr[item.index*3] = newX;
+                    posAttr[item.index*3+1] = newY;
+                    posAttr[item.index*3+2] = newZ;
+                    // Проверка, улетели ли далеко (более 500 единиц)
+                    if (Math.abs(newX) > 500 && Math.abs(newY) > 500 && Math.abs(newZ) > 500) {
+                        item.done = true;
+                    } else {
+                        allGone = false;
+                    }
+                }
+                // Обновляем буферы геометрий
+                for (let obj of allObjects) {
+                    if (obj.geometry && obj.geometry.attributes.position) {
+                        obj.geometry.attributes.position.needsUpdate = true;
+                    }
+                }
+                if (allGone) {
+                    // Удаляем все объекты из сцены
+                    for (let obj of allObjects) {
+                        scene.remove(obj);
+                    }
+                    universeEnded = false; // остановка анимации
+                    // Показываем сообщение в HUD
+                    document.getElementById('hand-status').innerHTML = "ВСЕЛЕННАЯ РАЗРУШЕНА";
+                    document.getElementById('gesture-name').innerHTML = "💀 НИЧЕГО НЕ ОСТАЛОСЬ 💀";
+                    // Дополнительно отключаем все кнопки и жесты (уже не работают из-за проверок universeEnded)
+                }
+            }
+            // Обновляем буферы позиций для всех объектов в процессе
+            if (explosionProgress === 0) {
+                for (let obj of allObjects) {
+                    if (obj.geometry && obj.geometry.attributes.position) {
+                        obj.geometry.attributes.position.needsUpdate = true;
+                    }
+                }
+            }
+        }
+        
+        // ---------- MEDIAPIPE (РАСПОЗНАВАНИЕ 2 РУК) ----------
+        const video = document.getElementById('video-input');
+        const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        
+        let bothHandsOpenDetected = false;
+        let bothHandsOpenTimer = 0;
+        
+        hands.onResults((res) => {
+            const handSpan = document.getElementById('hand-status');
+            const gestureSpan = document.getElementById('gesture-name');
+            if (controlMode !== "gesture") {
+                handSpan.innerText = "ОТКЛЮЧЕНО";
+                handSpan.style.color = "#888";
+                gestureSpan.innerText = "—";
+                return;
+            }
+            if (universeEnded) {
+                handSpan.innerText = "КОНЕЦ";
+                handSpan.style.color = "#f00";
+                return;
+            }
+            if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+                handSpan.innerText = "ЗАХВАЧЕНО";
+                handSpan.style.color = "#0f0";
+                // Обработка одной руки для управления (берём первую)
+                const lm = res.multiHandLandmarks[0];
+                const palm = lm[9];
+                targetRot.x = (palm.x - 0.5) * 1.8;
+                targetRot.y = (palm.y - 0.5) * 1.6;
+                // Пинч
+                const thumb = lm[4], index = lm[8];
+                const dist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+                let p = 0;
+                if (dist < 0.05) p = 1;
+                else if (dist > 0.15) p = 0;
+                else p = 1 - (dist - 0.05) / 0.1;
+                targetDistance = 55 - p * 40;
+                targetDistance = Math.min(Math.max(targetDistance, 15), 80);
+                
+                // Распознавание жестов одной руки (ладонь/кулак/указательный)
+                const gesture = detectOpenPalmAndFist(lm);
+                const now = Date.now();
+                let gestureDisplay = "—";
+                if (gesture === "open") {
+                    gestureDisplay = "🖐️ ЛАДОНЬ";
+                    if (lastDetectedGesture !== "open" && now - lastGestureTime > 400) {
+                        setSystemVisible(true);
+                        lastGestureTime = now;
+                    }
+                } else if (gesture === "fist") {
+                    gestureDisplay = "✊ КУЛАК";
+                    if (lastDetectedGesture !== "fist" && now - lastGestureTime > 400) {
+                        setSystemVisible(false);
+                        lastGestureTime = now;
+                    }
+                } else {
+                    const pointing = detectPointingDirection(lm);
+                    if (pointing === "left") {
+                        gestureDisplay = "👈 ВЛЕВО";
+                        if (lastPointingDirection !== "left" && now - lastGestureTime > 500) {
+                            prevPlanet();
+                            lastGestureTime = now;
+                        }
+                        lastPointingDirection = "left";
+                    } else if (pointing === "right") {
+                        gestureDisplay = "👉 ВПРАВО";
+                        if (lastPointingDirection !== "right" && now - lastGestureTime > 500) {
+                            nextPlanet();
+                            lastGestureTime = now;
+                        }
+                        lastPointingDirection = "right";
+                    } else {
+                        gestureDisplay = "🤷 НЕПОНЯТНО";
+                        lastPointingDirection = null;
+                    }
+                }
+                lastDetectedGesture = gestureDisplay;
+                gestureSpan.innerText = gestureDisplay;
+                
+                // ----- ОБНАРУЖЕНИЕ ДВУХ ОТКРЫТЫХ ЛАДОНЕЙ (ПАСХАЛКА) -----
+                if (res.multiHandLandmarks.length >= 2) {
+                    const hand1 = res.multiHandLandmarks[0];
+                    const hand2 = res.multiHandLandmarks[1];
+                    const gesture1 = detectOpenPalmAndFist(hand1);
+                    const gesture2 = detectOpenPalmAndFist(hand2);
+                    if (gesture1 === "open" && gesture2 === "open") {
+                        if (!bothHandsOpenDetected) {
+                            bothHandsOpenDetected = true;
+                            bothHandsOpenTimer = now;
+                        }
+                        // Задержка 0.5 секунды для подтверждения жеста
+                        if (now - bothHandsOpenTimer > 500 && !universeEnded) {
+                            startUniverseEnd();
+                            gestureSpan.innerHTML = "💥 ДВЕ ЛАДОНИ → КОНЕЦ 💥";
+                            handSpan.innerHTML = "АКТИВАЦИЯ";
+                        }
+                    } else {
+                        bothHandsOpenDetected = false;
+                    }
+                } else {
+                    bothHandsOpenDetected = false;
+                }
+            } else {
+                handSpan.innerText = "ПОИСК...";
+                handSpan.style.color = "#f66";
+                targetRot.x = 0; targetRot.y = 0;
+                gestureSpan.innerText = "—";
+                lastDetectedGesture = "none";
+                lastPointingDirection = null;
+                bothHandsOpenDetected = false;
+            }
+        });
+        
+        new Camera(video, { onFrame: async () => await hands.send({image:video}), width:640, height:480 }).start();
+        
+        // ---------- МЫШЬ ----------
+        function onMouseDown(e) { if (controlMode === "mouse") { mouseLeftDown = true; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
+        function onMouseMove(e) { if (controlMode === "mouse" && mouseLeftDown && !universeEnded) { mouseRotSpeed.x = (e.clientX - lastMouseX) * 0.008; mouseRotSpeed.y = (e.clientY - lastMouseY) * 0.008; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
+        function onMouseUp() { mouseLeftDown = false; }
+        function onWheel(e) { if (controlMode === "mouse" && !universeEnded) { targetDistance = Math.min(Math.max(targetDistance + (e.deltaY > 0 ? 2 : -2), 15), 80); e.preventDefault(); } }
+        
+        // ---------- UI ----------
+        function makeButtons() {
+            const container = document.getElementById('planet-buttons');
+            planetNames.forEach(n => {
+                const btn = document.createElement('button');
+                btn.innerText = n === "СОЛНЦЕ" ? "☀️ СОЛНЦЕ" : n;
+                btn.onclick = () => setTarget(n);
+                container.appendChild(btn);
+            });
+        }
+        
+        function setControlMode(mode) {
+            controlMode = mode;
+            document.getElementById('mode-indicator').innerText = mode === "gesture" ? "ЖЕСТЫ" : "МЫШЬ";
+            if (mode === "mouse") {
+                document.getElementById('hand-status').innerText = "ОТКЛЮЧЕНО";
+                document.getElementById('hand-status').style.color = "#888";
+                document.getElementById('gesture-name').innerText = "—";
+            } else {
+                document.getElementById('hand-status').innerText = "ПОИСК...";
+                document.getElementById('hand-status').style.color = "#f66";
+            }
+            mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
+            targetRot.x = 0; targetRot.y = 0;
+            currentRot.x = 0; currentRot.y = 0;
+        }
+        
+        document.getElementById('control-mode').addEventListener('click', () => {
+            setControlMode(controlMode === "gesture" ? "mouse" : "gesture");
+        });
+        
+        // FULLSCREEN
+        const fullBtn = document.getElementById('fullscreen-btn');
+        fullBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) { document.documentElement.requestFullscreen(); fullBtn.style.opacity = '0.5'; }
+            else { document.exitFullscreen(); fullBtn.style.opacity = '1'; }
+        });
+        document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) fullBtn.style.opacity = '1'; });
+        
+        // ---------- INIT ----------
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x030318);
+            scene.fog = new THREE.FogExp2(0x030318, 0.0003);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 20, cameraDistance);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            
+            starField = createStars();
+            planetsData.forEach(d => createPlanet(d));
+            moonParticles = createMoon();
+            makeButtons();
+            
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+            renderer.domElement.addEventListener('wheel', onWheel);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth/window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            let last = performance.now();
+            function animate() {
+                const now = performance.now();
+                let dt = Math.min(0.033, (now-last)/1000);
+                last = now;
+                if (!universeEnded) {
+                    updateOrbits();
+                    updateMoon();
+                    updateSwitch(dt);
+                    updateCamera(dt);
+                    updateVisibility(dt);
+                } else {
+                    updateExplosion(dt);
+                }
+                renderer.render(scene, camera);
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
