@@ -6,9 +6,9 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Солнечная система / Андромеда — космическая музыка</title>
+    <title>Солнечная система / Андромеда — жесты / мышь / сенсор</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
         #hud {
             position: absolute; top: 20px; left: 20px;
             background: rgba(0,0,0,0.8); border-left: 3px solid #0f0;
@@ -34,6 +34,7 @@
             color: #0f0; padding: 6px 12px; font-family: monospace;
             font-size: 12px; cursor: pointer; border-radius: 6px;
             transition: 0.2s;
+            touch-action: manipulation;
         }
         button:hover { background: #0f0; color: #000; }
         .top-buttons {
@@ -50,6 +51,7 @@
             font-size: 14px;
             cursor: pointer;
             border-radius: 6px;
+            touch-action: manipulation;
         }
         #settings-panel {
             position: absolute; top: 70px; right: 20px;
@@ -80,6 +82,7 @@
             border-radius: 4px;
             padding: 4px 8px;
             font-family: monospace;
+            touch-action: manipulation;
         }
         .quality-option {
             display: flex;
@@ -92,13 +95,14 @@
             text-align: center;
             margin-top: 5px;
         }
-        #control-mode {
+        #mode-switch {
             position: absolute; top: 80px; right: 20px;
             background: rgba(0,0,0,0.7); border: 1px solid #0f0;
             color: #0f0; padding: 6px 12px;
             font-family: monospace; font-size: 12px;
             border-radius: 6px; cursor: pointer;
             z-index: 200;
+            touch-action: manipulation;
         }
         .hud-value { color: #ffaa44; }
         .gesture-value { color: #88ff88; }
@@ -117,7 +121,7 @@
         }
     </style>
     <script>
-        const APP_VERSION = "2025-05-14-v3";
+        const APP_VERSION = "2025-05-15-v1";
         const savedVersion = localStorage.getItem("solar_system_version");
         if (savedVersion !== APP_VERSION) {
             localStorage.setItem("solar_system_version", APP_VERSION);
@@ -141,7 +145,7 @@
         <button id="fullscreen-btn">⛶ ПОЛНЫЙ ЭКРАН</button>
         <button id="settings-btn">⚙️ НАСТРОЙКИ</button>
     </div>
-    <button id="control-mode">🔘 РЕЖИМ (МЫШЬ/ЖЕСТЫ)</button>
+    <button id="mode-switch">🔘 РЕЖИМ: ЖЕСТЫ</button>
 
     <div id="settings-panel">
         <div style="text-align:center; margin-bottom:5px;">⚙️ НАСТРОЙКИ</div>
@@ -176,7 +180,7 @@
             <span>🔘 Frustum Culling</span>
             <input type="checkbox" id="frustum-culling" checked>
         </label>
-        <button id="enable-sound" style="background:#0f0; color:#000; margin-top:5px;">🔊 ВКЛЮЧИТЬ МУЗЫКУ</button>
+        <button id="enable-sound" style="background:#0f0; color:#000; margin-top:5px;">🔊 ВКЛЮЧИТЬ ЗВУК</button>
         <div class="note">При низком качестве частиц<br>производительность выше</div>
     </div>
 
@@ -190,19 +194,17 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
     <script>
-        // ========== КРАСИВАЯ КОСМИЧЕСКАЯ МУЗЫКА ==========
+        // ========== ЗВУКИ (короткие эффекты, включаются кнопкой) ==========
         let audioCtx = null;
-        let musicPlaying = false;
-        let bgMusicNodes = [];
-        let musicGain = null;
+        let soundEnabled = false;
         
         function playSwitchSound() {
-            if (!audioCtx || !musicPlaying) return;
+            if (!audioCtx || !soundEnabled) return;
             const now = audioCtx.currentTime;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = "sine";
-            osc.frequency.value = 1046.5; // C6 (колокольчик)
+            osc.frequency.value = 1046.5;
             gain.gain.value = 0.12;
             gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
             osc.connect(gain);
@@ -213,15 +215,14 @@
         
         let lastRotSound = 0;
         function playRotationSound(intensity) {
-            if (!audioCtx || !musicPlaying) return;
+            if (!audioCtx || !soundEnabled) return;
             const now = audioCtx.currentTime;
             if (now - lastRotSound < 0.08) return;
             lastRotSound = now;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = "sine";
-            const base = 523.25; // C5
-            osc.frequency.value = base + intensity * 200;
+            osc.frequency.value = 523.25 + intensity * 200;
             gain.gain.value = 0.04 * Math.min(0.6, intensity);
             gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
             osc.connect(gain);
@@ -230,75 +231,9 @@
             osc.stop(now + 0.2);
         }
         
-        function startBackgroundMusic() {
-            if (!audioCtx || musicPlaying) return;
-            musicPlaying = true;
-            musicGain = audioCtx.createGain();
-            musicGain.gain.value = 0.11; // тихо, фоном
-            musicGain.connect(audioCtx.destination);
-            
-            // Красивая арпеджио-последовательность (5 нот)
-            const notes = [261.63, 329.63, 392.00, 523.25, 392.00]; // C4, E4, G4, C5, G4
-            let noteIndex = 0;
-            
-            function scheduleNext() {
-                if (!musicPlaying || !audioCtx) return;
-                const now = audioCtx.currentTime;
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = "sine";
-                osc.frequency.value = notes[noteIndex % notes.length];
-                gain.gain.value = 0.0;
-                gain.gain.linearRampToValueAtTime(0.06, now + 0.05);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.5);
-                osc.connect(gain);
-                gain.connect(musicGain);
-                osc.start(now);
-                osc.stop(now + 2.5);
-                noteIndex++;
-                setTimeout(() => scheduleNext(), 2800);
-            }
-            scheduleNext();
-            
-            // Добавляем мягкий эмбиент-пад (долгий тон)
-            const padOsc = audioCtx.createOscillator();
-            const padGain = audioCtx.createGain();
-            padOsc.type = "sine";
-            padOsc.frequency.value = 130.81; // C3
-            padGain.gain.value = 0.04;
-            padOsc.connect(padGain);
-            padGain.connect(musicGain);
-            padOsc.start();
-            // второй пад – октавой выше
-            const padOsc2 = audioCtx.createOscillator();
-            const padGain2 = audioCtx.createGain();
-            padOsc2.type = "sine";
-            padOsc2.frequency.value = 261.63; // C4
-            padGain2.gain.value = 0.03;
-            padOsc2.connect(padGain2);
-            padGain2.connect(musicGain);
-            padOsc2.start();
-            // сохраняем, чтобы не потерять сборщиком мусора
-            bgMusicNodes = [padOsc, padOsc2];
-        }
-        
-        function stopMusic() {
-            if (!musicPlaying) return;
-            musicPlaying = false;
-            if (bgMusicNodes.length) {
-                bgMusicNodes.forEach(node => {
-                    try { node.stop(); } catch(e) {}
-                });
-                bgMusicNodes = [];
-            }
-            if (musicGain) musicGain.disconnect();
-            musicGain = null;
-        }
-        
         function enableSound() {
             if (audioCtx) return;
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            // тихий щелчок для активации
             const silent = audioCtx.createOscillator();
             const silentGain = audioCtx.createGain();
             silentGain.gain.value = 0;
@@ -306,16 +241,12 @@
             silentGain.connect(audioCtx.destination);
             silent.start();
             silent.stop(audioCtx.currentTime + 0.01);
-            startBackgroundMusic();
+            soundEnabled = true;
             const btn = document.getElementById('enable-sound');
-            btn.innerText = "🔊 МУЗЫКА ИГРАЕТ";
+            btn.innerText = "🔊 ЗВУК АКТИВЕН";
             btn.style.background = "#0f0";
             btn.style.color = "#000";
-            setTimeout(() => {
-                if (btn.innerText === "🔊 МУЗЫКА ИГРАЕТ") btn.innerText = "🔊 МУЗЫКА ИГРАЕТ";
-            }, 1500);
         }
-        
         document.getElementById('enable-sound').addEventListener('click', enableSound);
         
         // ---------- ДАННЫЕ ДВУХ СИСТЕМ ----------
@@ -363,7 +294,7 @@
         let cameraDistance = 55;
         let targetDistance = 55;
         let cameraPhi = 0, cameraTheta = 0.6;
-        let controlMode = "gesture";
+        let controlMode = "gesture"; // "gesture", "mouse", "touch"
         let mouseLeftDown = false, lastMouseX = 0, lastMouseY = 0;
         let mouseRotSpeed = { x: 0, y: 0 };
         let targetRot = { x: 0, y: 0 }, currentRot = { x: 0, y: 0 };
@@ -379,7 +310,14 @@
         let universeEnded = false, explosionProgress = 0, explosionObjects = [], explosionDuration = 2.0, explosionTimer = 0;
         let auraGroup = null;
         
-        // ---- Геометрические функции (полностью как в вашем коде) ----
+        // Сенсорное управление
+        let touchStartDist = 0;
+        let initialCameraDistance = 0;
+        let lastTouchX = 0, lastTouchY = 0;
+        let touchRotSpeed = { x: 0, y: 0 };
+        let touchActive = false;
+        
+        // ---- ГЕОМЕТРИЧЕСКИЕ ФУНКЦИИ (создание планет) ----
         function createPlanet(data, qualityFactor) {
             const count = Math.floor(data.baseParticles * qualityFactor);
             if (count < 100) return null;
@@ -579,6 +517,7 @@
                 currentTarget = window._pending;
                 currentRot.x = 0; currentRot.y = 0; targetRot.x = 0; targetRot.y = 0;
                 mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
+                touchRotSpeed.x = 0; touchRotSpeed.y = 0;
             }
         }
         
@@ -610,27 +549,35 @@
         function updateCamera(dt) {
             if (isSwitching) return;
             let rotIntensity = 0;
-            if (controlMode === "gesture" && !universeEnded) {
+            let rotX = 0, rotY = 0;
+            
+            if (controlMode === "gesture") {
                 const sens = 2.5;
                 currentRot.x += (targetRot.x * sens - currentRot.x) * 0.2;
                 currentRot.y += (targetRot.y * sens - currentRot.y) * 0.2;
-                const rotDeltaX = currentRot.x * dt * 1.5;
-                const rotDeltaY = currentRot.y * dt * 1.2;
-                cameraPhi += rotDeltaX;
-                cameraTheta += rotDeltaY;
-                rotIntensity = Math.sqrt(rotDeltaX*rotDeltaX + rotDeltaY*rotDeltaY) * 5;
+                rotX = currentRot.x * dt * 1.5;
+                rotY = currentRot.y * dt * 1.2;
+                rotIntensity = Math.sqrt(rotX*rotX + rotY*rotY) * 5;
                 pinch += (targetPinch - pinch) * 0.2;
                 cameraDistance += (targetDistance - cameraDistance) * 0.12;
             } else if (controlMode === "mouse") {
-                cameraPhi += mouseRotSpeed.x * dt * 1.8;
-                cameraTheta += mouseRotSpeed.y * dt * 1.5;
+                rotX = mouseRotSpeed.x * dt * 1.8;
+                rotY = mouseRotSpeed.y * dt * 1.5;
                 rotIntensity = Math.sqrt(mouseRotSpeed.x*mouseRotSpeed.x + mouseRotSpeed.y*mouseRotSpeed.y) * 2;
                 mouseRotSpeed.x *= 0.95; mouseRotSpeed.y *= 0.95;
                 cameraDistance += (targetDistance - cameraDistance) * 0.12;
+            } else if (controlMode === "touch") {
+                rotX = touchRotSpeed.x * dt * 1.8;
+                rotY = touchRotSpeed.y * dt * 1.5;
+                rotIntensity = Math.sqrt(touchRotSpeed.x*touchRotSpeed.x + touchRotSpeed.y*touchRotSpeed.y) * 2;
+                touchRotSpeed.x *= 0.96; touchRotSpeed.y *= 0.96;
+                cameraDistance += (targetDistance - cameraDistance) * 0.12;
             }
-            if (rotIntensity > 0.03) {
-                playRotationSound(Math.min(0.8, rotIntensity));
-            }
+            
+            cameraPhi += rotX;
+            cameraTheta += rotY;
+            if (rotIntensity > 0.03) playRotationSound(Math.min(0.8, rotIntensity));
+            
             cameraTheta = Math.max(0.05, Math.min(Math.PI - 0.05, cameraTheta));
             cameraDistance = Math.min(Math.max(cameraDistance, 15), 80);
             const x = Math.sin(cameraPhi) * Math.cos(cameraTheta) * cameraDistance;
@@ -659,7 +606,7 @@
             targetOpacity = visible ? 1.0 : 0.0;
         }
         
-        // ----- жесты -----
+        // ----- ЖЕСТЫ (ТОЛЬКО ДЛЯ РЕЖИМА gesture) -----
         function isVictoryGesture(lm) {
             const idxEx = lm[8].y < lm[6].y;
             const midEx = lm[12].y < lm[10].y;
@@ -687,7 +634,7 @@
             setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "✌️ ПОБЕДА") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 800);
         }
         
-        // ---- Конец вселенной ----
+        // ---- Конец вселенной (две ладони) ----
         function startUniverseEnd() {
             if (universeEnded) return;
             universeEnded = true;
@@ -750,7 +697,6 @@
             for (let obj of allObjects) if (obj && obj.isPoints) obj.frustumCulled = frustumCullingEnabled;
         }
         
-        // ----- настройки -----
         function initSettings() {
             const panel = document.getElementById('settings-panel');
             const btnSet = document.getElementById('settings-btn');
@@ -761,7 +707,7 @@
             const togglePreview = document.getElementById('toggle-preview');
             const previewCanvas = document.getElementById('preview-canvas');
             
-            btnSet.onclick = () => { if (panel.style.display==='none' || !panel.style.display) panel.style.display='flex'; else panel.style.display='none'; };
+            btnSet.onclick = () => { panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex'; };
             qualitySel.onchange = (e) => { currentQuality = parseFloat(e.target.value); regenerateWithOptions(); };
             systemSel.onchange = (e) => {
                 const newSys = e.target.value;
@@ -775,25 +721,92 @@
             };
             frustumChk.onchange = (e) => { frustumCullingEnabled = e.target.checked; applyFrustumCulling(); };
             togglePreview.onchange = (e) => {
-                if (e.target.checked) previewCanvas.style.display = "block";
-                else previewCanvas.style.display = "none";
+                previewCanvas.style.display = e.target.checked ? "block" : "none";
             };
         }
         
+        // ----- ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ -----
         function setControlMode(mode) {
             controlMode = mode;
-            document.getElementById('mode-indicator').innerText = mode === "gesture" ? "ЖЕСТЫ" : "МЫШЬ";
-            if (mode === "mouse") {
-                document.getElementById('hand-status').innerHTML = "ОТКЛЮЧЕНО";
-                document.getElementById('hand-status').style.color = "#888";
-                document.getElementById('gesture-name').innerHTML = "—";
+            const modeSpan = document.getElementById('mode-indicator');
+            const modeBtn = document.getElementById('mode-switch');
+            if (mode === "gesture") {
+                modeSpan.innerText = "ЖЕСТЫ";
+                modeBtn.innerText = "🔘 РЕЖИМ: ЖЕСТЫ";
+            } else if (mode === "mouse") {
+                modeSpan.innerText = "МЫШЬ";
+                modeBtn.innerText = "🔘 РЕЖИМ: МЫШЬ";
             } else {
-                document.getElementById('hand-status').innerHTML = "ПОИСК...";
-                document.getElementById('hand-status').style.color = "#f66";
+                modeSpan.innerText = "СЕНСОР";
+                modeBtn.innerText = "🔘 РЕЖИМ: СЕНСОР";
+            }
+            // Сброс скоростей
+            mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
+            touchRotSpeed.x = 0; touchRotSpeed.y = 0;
+            currentRot.x = 0; currentRot.y = 0;
+            targetRot.x = 0; targetRot.y = 0;
+        }
+        
+        function cycleMode() {
+            if (controlMode === "gesture") setControlMode("mouse");
+            else if (controlMode === "mouse") setControlMode("touch");
+            else setControlMode("gesture");
+        }
+        
+        // --- Обработчики сенсорного ввода (только для touch-режима)---
+        function onTouchStart(e) {
+            e.preventDefault();
+            if (controlMode !== "touch") return;
+            const touches = e.touches;
+            if (touches.length === 1) {
+                touchActive = true;
+                lastTouchX = touches[0].clientX;
+                lastTouchY = touches[0].clientY;
+            } else if (touches.length === 2) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                touchStartDist = Math.hypot(dx, dy);
+                initialCameraDistance = cameraDistance;
             }
         }
         
-        // --- MediaPipe ---
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (controlMode !== "touch") return;
+            const touches = e.touches;
+            if (touches.length === 1 && touchActive) {
+                const dx = touches[0].clientX - lastTouchX;
+                const dy = touches[0].clientY - lastTouchY;
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                    touchRotSpeed.x = dx * 0.008;
+                    touchRotSpeed.y = dy * 0.008;
+                    lastTouchX = touches[0].clientX;
+                    lastTouchY = touches[0].clientY;
+                }
+            } else if (touches.length === 2) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                const newDist = Math.hypot(dx, dy);
+                if (touchStartDist > 0) {
+                    const scale = newDist / touchStartDist;
+                    targetDistance = Math.min(Math.max(initialCameraDistance / scale, 15), 80);
+                }
+            }
+        }
+        
+        function onTouchEnd(e) {
+            e.preventDefault();
+            touchActive = false;
+            touchStartDist = 0;
+        }
+        
+        // --- Обработчики мыши ---
+        function onMouseDown(e) { if (controlMode === "mouse") { mouseLeftDown = true; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
+        function onMouseMove(e) { if (controlMode === "mouse" && mouseLeftDown && !universeEnded) { mouseRotSpeed.x = (e.clientX - lastMouseX) * 0.008; mouseRotSpeed.y = (e.clientY - lastMouseY) * 0.008; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
+        function onMouseUp() { mouseLeftDown = false; }
+        function onWheel(e) { if (controlMode === "mouse" && !universeEnded) { targetDistance = Math.min(Math.max(targetDistance + (e.deltaY > 0 ? 2 : -2), 15), 80); e.preventDefault(); } }
+        
+        // --- MediaPipe (ЖЕСТЫ) ---
         const videoEl = document.getElementById('video-input');
         const handsPipe = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
         handsPipe.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
@@ -863,6 +876,7 @@
             const previewMode = document.getElementById('preview-mode').value;
             const previewEnabled = document.getElementById('toggle-preview').checked;
             
+            // Рисование скелета/камеры (всегда, независимо от режима, если включен предпросмотр)
             if (previewEnabled) {
                 if (previewMode === "skeleton") {
                     if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
@@ -882,69 +896,119 @@
                 ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
             }
             
-            if (controlMode !== "gesture") { 
-                hSpan.innerText = "ОТКЛЮЧЕНО"; hSpan.style.color="#888"; gSpan.innerText="—"; 
-                return; 
+            // Обработка жестов ТОЛЬКО в режиме gesture
+            if (controlMode !== "gesture") {
+                hSpan.innerText = controlMode === "mouse" ? "МЫШЬ" : "СЕНСОР";
+                hSpan.style.color = "#888";
+                return;
             }
-            if (universeEnded) { 
-                hSpan.innerText = "КОНЕЦ"; hSpan.style.color="#f00"; 
-                return; 
+            
+            if (universeEnded) {
+                hSpan.innerText = "КОНЕЦ";
+                hSpan.style.color = "#f00";
+                return;
             }
+            
             if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
-                hSpan.innerText = "ЗАХВАЧЕНО"; hSpan.style.color="#0f0";
+                hSpan.innerText = "ЗАХВАЧЕНО";
+                hSpan.style.color = "#0f0";
                 const lm = res.multiHandLandmarks[0];
                 const palm = lm[9];
-                targetRot.x = (palm.x-0.5)*1.8; targetRot.y = (palm.y-0.5)*1.6;
+                targetRot.x = (palm.x - 0.5) * 1.8;
+                targetRot.y = (palm.y - 0.5) * 1.6;
                 const thumb = lm[4], idx = lm[8];
-                const d = Math.hypot(thumb.x-idx.x, thumb.y-idx.y);
-                let p = 0; if (d<0.05) p=1; else if(d>0.15) p=0; else p=1-(d-0.05)/0.1;
-                targetDistance = 55 - p*40; targetDistance = Math.min(Math.max(targetDistance,15),80);
+                const d = Math.hypot(thumb.x - idx.x, thumb.y - idx.y);
+                let p = 0;
+                if (d < 0.05) p = 1;
+                else if (d > 0.15) p = 0;
+                else p = 1 - (d - 0.05) / 0.1;
+                targetDistance = 55 - p * 40;
+                targetDistance = Math.min(Math.max(targetDistance, 15), 80);
+                
                 const now = Date.now();
                 const victory = isVictoryGesture(lm);
                 const pf = detectOpenPalmAndFist(lm);
                 let gdisp = "—";
-                if (victory && now-victoryCD>700) { nextPlanet(); victoryCD=now; gdisp="✌️ ПОБЕДА"; }
-                else if (pf==="open") { gdisp="🖐️ ЛАДОНЬ"; if (lastDetectedGesture!=="open" && now-lastGestureTime>400) { setSystemVisible(true); lastGestureTime=now; } }
-                else if (pf==="fist") { gdisp="✊ КУЛАК"; if (lastDetectedGesture!=="fist" && now-lastGestureTime>400) { setSystemVisible(false); lastGestureTime=now; } }
-                else gdisp="🤷 НЕПОНЯТНО";
-                lastDetectedGesture = gdisp; gSpan.innerText = gdisp;
-                if (res.multiHandLandmarks.length>=2) {
+                
+                if (victory && now - victoryCD > 700) {
+                    nextPlanet();
+                    victoryCD = now;
+                    gdisp = "✌️ ПОБЕДА";
+                } else if (pf === "open") {
+                    gdisp = "🖐️ ЛАДОНЬ";
+                    if (lastDetectedGesture !== "open" && now - lastGestureTime > 400) {
+                        setSystemVisible(true);
+                        lastGestureTime = now;
+                    }
+                } else if (pf === "fist") {
+                    gdisp = "✊ КУЛАК";
+                    if (lastDetectedGesture !== "fist" && now - lastGestureTime > 400) {
+                        setSystemVisible(false);
+                        lastGestureTime = now;
+                    }
+                } else {
+                    gdisp = "🤷 НЕПОНЯТНО";
+                }
+                lastDetectedGesture = gdisp;
+                gSpan.innerText = gdisp;
+                
+                // Две раскрытые ладони – конец вселенной
+                if (res.multiHandLandmarks.length >= 2) {
                     const g1 = detectOpenPalmAndFist(res.multiHandLandmarks[0]);
                     const g2 = detectOpenPalmAndFist(res.multiHandLandmarks[1]);
-                    if (g1==="open" && g2==="open") {
-                        if (!bothHandsOpen) { bothHandsOpen=true; bothTimer=now; }
-                        if (now-bothTimer>500 && !universeEnded) { startUniverseEnd(); gSpan.innerHTML="💥 ДВЕ ЛАДОНИ → КОНЕЦ"; hSpan.innerHTML="АКТИВАЦИЯ"; }
-                    } else bothHandsOpen=false;
+                    if (g1 === "open" && g2 === "open") {
+                        if (!bothHandsOpen) {
+                            bothHandsOpen = true;
+                            bothTimer = now;
+                        }
+                        if (now - bothTimer > 500 && !universeEnded) {
+                            startUniverseEnd();
+                            gSpan.innerHTML = "💥 ДВЕ ЛАДОНИ → КОНЕЦ 💥";
+                            hSpan.innerHTML = "АКТИВАЦИЯ";
+                        }
+                    } else {
+                        bothHandsOpen = false;
+                    }
                 }
             } else {
-                hSpan.innerText = "ПОИСК..."; hSpan.style.color="#f66";
-                targetRot.x=0; targetRot.y=0; gSpan.innerText="—";
-                lastDetectedGesture="none"; victoryCD=0;
+                hSpan.innerText = "ПОИСК...";
+                hSpan.style.color = "#f66";
+                targetRot.x = 0;
+                targetRot.y = 0;
+                gSpan.innerText = "—";
+                lastDetectedGesture = "none";
+                victoryCD = 0;
             }
         });
         
         const cameraUtils = new Camera(videoEl, { onFrame: async () => await handsPipe.send({image:videoEl}), width:640, height:480 });
         cameraUtils.start();
         
-        // --- мышь ---
-        function onMouseDown(e) { if (controlMode==="mouse") { mouseLeftDown=true; lastMouseX=e.clientX; lastMouseY=e.clientY; } }
-        function onMouseMove(e) { if (controlMode==="mouse" && mouseLeftDown && !universeEnded) { mouseRotSpeed.x=(e.clientX-lastMouseX)*0.008; mouseRotSpeed.y=(e.clientY-lastMouseY)*0.008; lastMouseX=e.clientX; lastMouseY=e.clientY; } }
-        function onMouseUp() { mouseLeftDown=false; }
-        function onWheel(e) { if (controlMode==="mouse" && !universeEnded) { targetDistance = Math.min(Math.max(targetDistance+(e.deltaY>0?2:-2),15),80); e.preventDefault(); } }
-        
-        // --- fullscreen ---
+        // --- Полноэкранный режим ---
         const fullBtn = document.getElementById('fullscreen-btn');
-        fullBtn.addEventListener('click',()=>{ if(!document.fullscreenElement) { document.documentElement.requestFullscreen(); fullBtn.style.opacity='0.5'; } else { document.exitFullscreen(); fullBtn.style.opacity='1'; } });
-        document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement) fullBtn.style.opacity='1'; });
-        document.getElementById('control-mode').addEventListener('click',()=>{ setControlMode(controlMode==="gesture"?"mouse":"gesture"); });
+        fullBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                fullBtn.style.opacity = '0.5';
+            } else {
+                document.exitFullscreen();
+                fullBtn.style.opacity = '1';
+            }
+        });
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) fullBtn.style.opacity = '1';
+        });
         
-        // --- init ---
+        // --- Кнопка переключения режимов ---
+        document.getElementById('mode-switch').addEventListener('click', cycleMode);
+        
+        // --- Инициализация ---
         async function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x030318);
             scene.fog = new THREE.FogExp2(0x030318, 0.0003);
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.set(0,20,cameraDistance);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 20, cameraDistance);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
@@ -952,12 +1016,17 @@
             currentTarget = currentPlanetsData[0].name;
             regenerateWithOptions();
             initSettings();
+            
             renderer.domElement.addEventListener('mousedown', onMouseDown);
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('mouseup', onMouseUp);
             renderer.domElement.addEventListener('wheel', onWheel);
-            window.addEventListener('resize', ()=>{
-                camera.aspect = window.innerWidth/window.innerHeight;
+            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+            renderer.domElement.addEventListener('touchend', onTouchEnd);
+            renderer.domElement.addEventListener('touchcancel', onTouchEnd);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
@@ -965,11 +1034,17 @@
             let last = performance.now();
             function animate() {
                 const now = performance.now();
-                let dt = Math.min(0.033, (now-last)/1000);
+                let dt = Math.min(0.033, (now - last) / 1000);
                 last = now;
                 if (!universeEnded) {
-                    updateOrbits(); updateMoon(); updateSwitch(dt); updateCamera(dt); updateVisibility(dt);
-                } else updateExplosion(dt);
+                    updateOrbits();
+                    updateMoon();
+                    updateSwitch(dt);
+                    updateCamera(dt);
+                    updateVisibility(dt);
+                } else {
+                    updateExplosion(dt);
+                }
                 renderer.render(scene, camera);
                 requestAnimationFrame(animate);
             }
