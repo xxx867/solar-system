@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Солнечная система / Андромеда — предпросмотр со скелетом / камерой</title>
+    <title>Солнечная система / Андромеда — космическая музыка</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #hud {
@@ -57,7 +57,7 @@
             border: 1px solid #0f0;
             border-radius: 12px;
             padding: 15px;
-            width: 270px;
+            width: 280px;
             z-index: 250;
             color: #0f0;
             font-family: monospace;
@@ -102,7 +102,6 @@
         }
         .hud-value { color: #ffaa44; }
         .gesture-value { color: #88ff88; }
-        /* Canvas для скелета / камеры — слева сверху */
         #preview-canvas {
             position: absolute;
             top: 20px;
@@ -118,7 +117,7 @@
         }
     </style>
     <script>
-        const APP_VERSION = "2025-05-13-v7";
+        const APP_VERSION = "2025-05-14-v3";
         const savedVersion = localStorage.getItem("solar_system_version");
         if (savedVersion !== APP_VERSION) {
             localStorage.setItem("solar_system_version", APP_VERSION);
@@ -177,6 +176,7 @@
             <span>🔘 Frustum Culling</span>
             <input type="checkbox" id="frustum-culling" checked>
         </label>
+        <button id="enable-sound" style="background:#0f0; color:#000; margin-top:5px;">🔊 ВКЛЮЧИТЬ МУЗЫКУ</button>
         <div class="note">При низком качестве частиц<br>производительность выше</div>
     </div>
 
@@ -190,7 +190,135 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
     <script>
-        // ---------- ДАННЫЕ ДВУХ СИСТЕМ (100% как в вашем коде) ----------
+        // ========== КРАСИВАЯ КОСМИЧЕСКАЯ МУЗЫКА ==========
+        let audioCtx = null;
+        let musicPlaying = false;
+        let bgMusicNodes = [];
+        let musicGain = null;
+        
+        function playSwitchSound() {
+            if (!audioCtx || !musicPlaying) return;
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = 1046.5; // C6 (колокольчик)
+            gain.gain.value = 0.12;
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(now + 0.6);
+        }
+        
+        let lastRotSound = 0;
+        function playRotationSound(intensity) {
+            if (!audioCtx || !musicPlaying) return;
+            const now = audioCtx.currentTime;
+            if (now - lastRotSound < 0.08) return;
+            lastRotSound = now;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            const base = 523.25; // C5
+            osc.frequency.value = base + intensity * 200;
+            gain.gain.value = 0.04 * Math.min(0.6, intensity);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(now + 0.2);
+        }
+        
+        function startBackgroundMusic() {
+            if (!audioCtx || musicPlaying) return;
+            musicPlaying = true;
+            musicGain = audioCtx.createGain();
+            musicGain.gain.value = 0.11; // тихо, фоном
+            musicGain.connect(audioCtx.destination);
+            
+            // Красивая арпеджио-последовательность (5 нот)
+            const notes = [261.63, 329.63, 392.00, 523.25, 392.00]; // C4, E4, G4, C5, G4
+            let noteIndex = 0;
+            
+            function scheduleNext() {
+                if (!musicPlaying || !audioCtx) return;
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = "sine";
+                osc.frequency.value = notes[noteIndex % notes.length];
+                gain.gain.value = 0.0;
+                gain.gain.linearRampToValueAtTime(0.06, now + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.5);
+                osc.connect(gain);
+                gain.connect(musicGain);
+                osc.start(now);
+                osc.stop(now + 2.5);
+                noteIndex++;
+                setTimeout(() => scheduleNext(), 2800);
+            }
+            scheduleNext();
+            
+            // Добавляем мягкий эмбиент-пад (долгий тон)
+            const padOsc = audioCtx.createOscillator();
+            const padGain = audioCtx.createGain();
+            padOsc.type = "sine";
+            padOsc.frequency.value = 130.81; // C3
+            padGain.gain.value = 0.04;
+            padOsc.connect(padGain);
+            padGain.connect(musicGain);
+            padOsc.start();
+            // второй пад – октавой выше
+            const padOsc2 = audioCtx.createOscillator();
+            const padGain2 = audioCtx.createGain();
+            padOsc2.type = "sine";
+            padOsc2.frequency.value = 261.63; // C4
+            padGain2.gain.value = 0.03;
+            padOsc2.connect(padGain2);
+            padGain2.connect(musicGain);
+            padOsc2.start();
+            // сохраняем, чтобы не потерять сборщиком мусора
+            bgMusicNodes = [padOsc, padOsc2];
+        }
+        
+        function stopMusic() {
+            if (!musicPlaying) return;
+            musicPlaying = false;
+            if (bgMusicNodes.length) {
+                bgMusicNodes.forEach(node => {
+                    try { node.stop(); } catch(e) {}
+                });
+                bgMusicNodes = [];
+            }
+            if (musicGain) musicGain.disconnect();
+            musicGain = null;
+        }
+        
+        function enableSound() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            // тихий щелчок для активации
+            const silent = audioCtx.createOscillator();
+            const silentGain = audioCtx.createGain();
+            silentGain.gain.value = 0;
+            silent.connect(silentGain);
+            silentGain.connect(audioCtx.destination);
+            silent.start();
+            silent.stop(audioCtx.currentTime + 0.01);
+            startBackgroundMusic();
+            const btn = document.getElementById('enable-sound');
+            btn.innerText = "🔊 МУЗЫКА ИГРАЕТ";
+            btn.style.background = "#0f0";
+            btn.style.color = "#000";
+            setTimeout(() => {
+                if (btn.innerText === "🔊 МУЗЫКА ИГРАЕТ") btn.innerText = "🔊 МУЗЫКА ИГРАЕТ";
+            }, 1500);
+        }
+        
+        document.getElementById('enable-sound').addEventListener('click', enableSound);
+        
+        // ---------- ДАННЫЕ ДВУХ СИСТЕМ ----------
         const systemsData = {
             solar: {
                 name: "Солнечная система",
@@ -251,7 +379,7 @@
         let universeEnded = false, explosionProgress = 0, explosionObjects = [], explosionDuration = 2.0, explosionTimer = 0;
         let auraGroup = null;
         
-        // ---- Геометрические функции (без изменений) ----
+        // ---- Геометрические функции (полностью как в вашем коде) ----
         function createPlanet(data, qualityFactor) {
             const count = Math.floor(data.baseParticles * qualityFactor);
             if (count < 100) return null;
@@ -432,6 +560,7 @@
             isSwitching = true; switchTimer = 0;
             window._pending = name;
             document.getElementById('target-name').innerText = name;
+            playSwitchSound();
         }
         
         function updateSwitch(dt) {
@@ -480,19 +609,27 @@
         
         function updateCamera(dt) {
             if (isSwitching) return;
+            let rotIntensity = 0;
             if (controlMode === "gesture" && !universeEnded) {
                 const sens = 2.5;
                 currentRot.x += (targetRot.x * sens - currentRot.x) * 0.2;
                 currentRot.y += (targetRot.y * sens - currentRot.y) * 0.2;
-                cameraPhi += currentRot.x * dt * 1.5;
-                cameraTheta += currentRot.y * dt * 1.2;
+                const rotDeltaX = currentRot.x * dt * 1.5;
+                const rotDeltaY = currentRot.y * dt * 1.2;
+                cameraPhi += rotDeltaX;
+                cameraTheta += rotDeltaY;
+                rotIntensity = Math.sqrt(rotDeltaX*rotDeltaX + rotDeltaY*rotDeltaY) * 5;
                 pinch += (targetPinch - pinch) * 0.2;
                 cameraDistance += (targetDistance - cameraDistance) * 0.12;
             } else if (controlMode === "mouse") {
                 cameraPhi += mouseRotSpeed.x * dt * 1.8;
                 cameraTheta += mouseRotSpeed.y * dt * 1.5;
+                rotIntensity = Math.sqrt(mouseRotSpeed.x*mouseRotSpeed.x + mouseRotSpeed.y*mouseRotSpeed.y) * 2;
                 mouseRotSpeed.x *= 0.95; mouseRotSpeed.y *= 0.95;
                 cameraDistance += (targetDistance - cameraDistance) * 0.12;
+            }
+            if (rotIntensity > 0.03) {
+                playRotationSound(Math.min(0.8, rotIntensity));
             }
             cameraTheta = Math.max(0.05, Math.min(Math.PI - 0.05, cameraTheta));
             cameraDistance = Math.min(Math.max(cameraDistance, 15), 80);
@@ -522,7 +659,7 @@
             targetOpacity = visible ? 1.0 : 0.0;
         }
         
-        // ----- жесты (без изменений) -----
+        // ----- жесты -----
         function isVictoryGesture(lm) {
             const idxEx = lm[8].y < lm[6].y;
             const midEx = lm[12].y < lm[10].y;
@@ -550,7 +687,7 @@
             setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "✌️ ПОБЕДА") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 800);
         }
         
-        // ---- Конец вселенной (оставлен) ----
+        // ---- Конец вселенной ----
         function startUniverseEnd() {
             if (universeEnded) return;
             universeEnded = true;
@@ -656,7 +793,7 @@
             }
         }
         
-        // --- MediaPipe с отрисовкой скелета или камеры + выключатель ---
+        // --- MediaPipe ---
         const videoEl = document.getElementById('video-input');
         const handsPipe = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
         handsPipe.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
@@ -725,7 +862,6 @@
             const gSpan = document.getElementById('gesture-name');
             const previewMode = document.getElementById('preview-mode').value;
             const previewEnabled = document.getElementById('toggle-preview').checked;
-            const previewCanvasElem = document.getElementById('preview-canvas');
             
             if (previewEnabled) {
                 if (previewMode === "skeleton") {
@@ -739,14 +875,13 @@
                         ctx.font = '12px monospace';
                         ctx.fillText('Рука не обнаружена', 20, 40);
                     }
-                } else { // camera mode
+                } else {
                     drawCameraPreview();
                 }
             } else {
                 ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
             }
             
-            // ОСНОВНАЯ ЛОГИКА УПРАВЛЕНИЯ (без изменений)
             if (controlMode !== "gesture") { 
                 hSpan.innerText = "ОТКЛЮЧЕНО"; hSpan.style.color="#888"; gSpan.innerText="—"; 
                 return; 
@@ -788,7 +923,6 @@
             }
         });
         
-        // Запуск камеры
         const cameraUtils = new Camera(videoEl, { onFrame: async () => await handsPipe.send({image:videoEl}), width:640, height:480 });
         cameraUtils.start();
         
