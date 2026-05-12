@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Солнечная система — управление жестами + настройки</title>
+    <title>Солнечная система / Галактика Андромеда — аура и жесты</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #hud {
@@ -36,20 +36,20 @@
             transition: 0.2s;
         }
         button:hover { background: #0f0; color: #000; }
-        #fullscreen-btn {
+        .top-buttons {
             position: absolute; top: 20px; right: 20px;
-            background: rgba(0,0,0,0.6); border: 1px solid #0f0;
-            color: #0f0; padding: 6px 12px; cursor: pointer;
-            z-index: 200; font-family: monospace;
-            border-radius: 6px;
+            display: flex; gap: 10px;
+            z-index: 201;
         }
-        #settings-btn {
-            position: absolute; top: 20px; right: 90px;
-            background: rgba(0,0,0,0.6); border: 1px solid #0f0;
-            color: #0f0; padding: 6px 12px; cursor: pointer;
-            z-index: 200; font-family: monospace;
+        .top-buttons button {
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 6px 12px;
+            font-family: monospace;
+            font-size: 14px;
+            cursor: pointer;
             border-radius: 6px;
-            font-size: 16px;
         }
         #settings-panel {
             position: absolute; top: 70px; right: 20px;
@@ -57,7 +57,7 @@
             border: 1px solid #0f0;
             border-radius: 12px;
             padding: 15px;
-            width: 220px;
+            width: 240px;
             z-index: 250;
             color: #0f0;
             font-family: monospace;
@@ -104,16 +104,10 @@
         .gesture-value { color: #88ff88; }
     </style>
     <script>
-        // ---------- АВТОМАТИЧЕСКАЯ ОЧИСТКА КЕША ПРИ ОБНОВЛЕНИИ ----------
-        // Меняй эту цифру при каждом обновлении сайта (можно использовать timestamp)
-        const APP_VERSION = "2025-05-12-v2";
-        
-        // При загрузке страницы проверяем, совпадает ли сохранённая версия с текущей
+        const APP_VERSION = "2025-05-12-v4"; // меняй при обновлении
         const savedVersion = localStorage.getItem("solar_system_version");
         if (savedVersion !== APP_VERSION) {
-            // Версия изменилась — сохраняем новую и перезагружаем страницу с очисткой кеша
             localStorage.setItem("solar_system_version", APP_VERSION);
-            // Принудительная перезагрузка без кеша
             window.location.reload(true);
         }
     </script>
@@ -130,8 +124,10 @@
         🖐️ ЛАДОНЬ → ПОКАЗАТЬ &nbsp;| ✊ КУЛАК → СКРЫТЬ &nbsp;| ✌️ ПОБЕДА → СЛЕД. ПЛАНЕТА
     </div>
     <div class="buttons" id="planet-buttons"></div>
-    <button id="fullscreen-btn">⛶ ПОЛНЫЙ ЭКРАН</button>
-    <button id="settings-btn">⚙️</button>
+    <div class="top-buttons">
+        <button id="fullscreen-btn">⛶ ПОЛНЫЙ ЭКРАН</button>
+        <button id="settings-btn">⚙️ НАСТРОЙКИ</button>
+    </div>
     <button id="control-mode">🔘 РЕЖИМ (МЫШЬ/ЖЕСТЫ)</button>
 
     <div id="settings-panel">
@@ -143,6 +139,13 @@
                 <option value="0.7">Высокое</option>
                 <option value="0.4">Среднее</option>
                 <option value="0.2">Низкое</option>
+            </select>
+        </div>
+        <div class="quality-option">
+            <span>Выбор системы:</span>
+            <select id="system-select">
+                <option value="solar">🌞 Солнечная система</option>
+                <option value="andromeda">🌀 Галактика Андромеда</option>
             </select>
         </div>
         <label>
@@ -161,107 +164,55 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
     <script>
-        // ---------- ПЛАНЕТЫ (базовые настройки) ----------
-        const planetsDataTemplate = [
-            { name: "СОЛНЦЕ", radius: 12, distance: 0, color: [0xffaa44, 0xff6644], baseParticles: 20000, isSun: true, speed: 0 },
-            { name: "МЕРКУРИЙ", radius: 1.8, distance: 18, color: [0xaa8866], baseParticles: 3000, speed: 0.006 },
-            { name: "ВЕНЕРА", radius: 2.2, distance: 25, color: [0xdd9988], baseParticles: 4000, speed: 0.0045 },
-            { name: "ЗЕМЛЯ", radius: 2.5, distance: 32, color: [0x3388ff, 0x44cc44], baseParticles: 12000, speed: 0.0035 },
-            { name: "МАРС", radius: 2.0, distance: 39, color: [0xcc6644], baseParticles: 4000, speed: 0.003 },
-            { name: "ЮПИТЕР", radius: 5.5, distance: 52, color: [0xd2b48c], baseParticles: 15000, speed: 0.002 },
-            { name: "САТУРН", radius: 4.8, distance: 68, color: [0xd2b48c, 0xc2b280], baseParticles: 18000, speed: 0.0015, hasRings: true },
-            { name: "УРАН", radius: 3.5, distance: 82, color: [0x88ccff], baseParticles: 8000, speed: 0.0012 },
-            { name: "НЕПТУН", radius: 3.5, distance: 96, color: [0x3366aa], baseParticles: 8000, speed: 0.001 }
-        ];
-        const planetNames = ["СОЛНЦЕ","МЕРКУРИЙ","ВЕНЕРА","ЗЕМЛЯ","МАРС","ЮПИТЕР","САТУРН","УРАН","НЕПТУН"];
-        
-        let scene, camera, renderer;
-        let planets = {};
-        let moonParticles = null;
-        let starField = null;
-        let targetPositions = {};
-        let currentTargetIdx = 0;
-        let currentTarget = planetNames[0];
-        
-        let cameraDistance = 55;
-        let targetDistance = 55;
-        let cameraPhi = 0, cameraTheta = 0.6;
-        
-        let controlMode = "gesture";
-        let mouseLeftDown = false;
-        let lastMouseX = 0, lastMouseY = 0;
-        let mouseRotSpeed = { x: 0, y: 0 };
-        let targetRot = { x: 0, y: 0 };
-        let currentRot = { x: 0, y: 0 };
-        let pinch = 0, targetPinch = 0;
-        
-        let systemVisible = true;
-        let targetOpacity = 1.0;
-        let currentOpacity = 1.0;
-        let allObjects = [];
-        
-        let moonAngle = 0;
-        const moonOrbitRadius = 6;
-        let moonSpeed = 0.025;
-        
-        let isSwitching = false;
-        let switchTimer = 0;
-        const switchDuration = 1.5;
-        let startCamPos = new THREE.Vector3();
-        let endTargetPos = new THREE.Vector3();
-        let startDist = cameraDistance;
-        let startPhi = cameraPhi, startTheta = cameraTheta;
-        
-        let lastGestureTime = 0;
-        let lastDetectedGesture = "none";
-        
-        // ---------- ПЕРЕМЕННЫЕ ДЛЯ НАСТРОЕК ----------
-        let currentQuality = 1.0;
-        let frustumCullingEnabled = true;
-        
-        // ---------- ЖЕСТЫ ----------
-        function isVictoryGesture(landmarks) {
-            const indexExtended = landmarks[8].y < landmarks[6].y;
-            const middleExtended = landmarks[12].y < landmarks[10].y;
-            const ringFolded = landmarks[16].y > landmarks[14].y;
-            const pinkyFolded = landmarks[20].y > landmarks[18].y;
-            const thumbFolded = Math.abs(landmarks[4].x - landmarks[2].x) < 0.07;
-            return indexExtended && middleExtended && ringFolded && pinkyFolded && thumbFolded;
-        }
-        
-        function detectOpenPalmAndFist(landmarks) {
-            const wrist = landmarks[0];
-            const tips = [4, 8, 12, 16, 20];
-            let avgDist = 0, extendedCount = 0;
-            for (let tip of tips) {
-                const dx = landmarks[tip].x - wrist.x;
-                const dy = landmarks[tip].y - wrist.y;
-                const dist = Math.hypot(dx, dy);
-                avgDist += dist;
-                if (dist > 0.22) extendedCount++;
+        // ---------- ДАННЫЕ ДВУХ СИСТЕМ ----------
+        const systemsData = {
+            solar: {
+                name: "Солнечная система",
+                planets: [
+                    { name: "СОЛНЦЕ", radius: 12, distance: 0, color: [0xffaa44, 0xff6644], baseParticles: 20000, isSun: true, speed: 0 },
+                    { name: "МЕРКУРИЙ", radius: 1.8, distance: 18, color: [0xaa8866], baseParticles: 3000, speed: 0.006 },
+                    { name: "ВЕНЕРА", radius: 2.2, distance: 25, color: [0xdd9988], baseParticles: 4000, speed: 0.0045 },
+                    { name: "ЗЕМЛЯ", radius: 2.5, distance: 32, color: [0x3388ff, 0x44cc44], baseParticles: 12000, speed: 0.0035 },
+                    { name: "МАРС", radius: 2.0, distance: 39, color: [0xcc6644], baseParticles: 4000, speed: 0.003 },
+                    { name: "ЮПИТЕР", radius: 5.5, distance: 52, color: [0xd2b48c], baseParticles: 15000, speed: 0.002 },
+                    { name: "САТУРН", radius: 4.8, distance: 68, color: [0xd2b48c, 0xc2b280], baseParticles: 18000, speed: 0.0015, hasRings: true },
+                    { name: "УРАН", radius: 3.5, distance: 82, color: [0x88ccff], baseParticles: 8000, speed: 0.0012 },
+                    { name: "НЕПТУН", radius: 3.5, distance: 96, color: [0x3366aa], baseParticles: 8000, speed: 0.001 }
+                ]
+            },
+            andromeda: {
+                name: "Галактика Андромеда",
+                planets: [
+                    { name: "АРКТУР", radius: 14, distance: 0, color: [0xffaa66, 0xffaa88], baseParticles: 22000, isSun: true, speed: 0, aura: true },
+                    { name: "АУРИГА", radius: 2.4, distance: 21, color: [0xaa66ff, 0xcc88ff], baseParticles: 3800, speed: 0.0068, aura: false },
+                    { name: "НЕБУЛА", radius: 2.6, distance: 29, color: [0x44ccdd, 0x88ddff], baseParticles: 4800, speed: 0.0052, aura: false },
+                    { name: "ЭФИР", radius: 3.2, distance: 37, color: [0x88aaff, 0xaaccff], baseParticles: 12000, speed: 0.004, aura: false },
+                    { name: "ФАНТОМ", radius: 2.2, distance: 45, color: [0x9999cc, 0xbbbbee], baseParticles: 4200, speed: 0.0033, aura: false },
+                    { name: "ВУЛКАН", radius: 5.8, distance: 59, color: [0xff6644, 0xff8866], baseParticles: 16000, speed: 0.0025, aura: false },
+                    { name: "ТЕРРА-НОВА", radius: 5.0, distance: 75, color: [0x66cc66, 0x88ff88], baseParticles: 18000, speed: 0.0019, hasRings: true, aura: false },
+                    { name: "ЛЕДЯНОЙ ГОЛИАФ", radius: 3.6, distance: 89, color: [0x88ccff, 0xaaffff], baseParticles: 8000, speed: 0.0015, aura: false },
+                    { name: "КСАНТАР", radius: 3.6, distance: 103, color: [0xffcc66, 0xffdd88], baseParticles: 8000, speed: 0.0012, aura: false }
+                ]
             }
-            avgDist /= tips.length;
-            if (extendedCount >= 4 && avgDist > 0.28) return "open";
-            if (extendedCount <= 1 && avgDist < 0.18) return "fist";
-            return "unknown";
-        }
+        };
         
-        function nextPlanet() {
-            if (universeEnded) return;
-            const nextIdx = (currentTargetIdx + 1) % planetNames.length;
-            setTarget(planetNames[nextIdx]);
-            document.getElementById('gesture-name').innerHTML = "✌️ ПОБЕДА → СЛЕД.";
-            setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "✌️ ПОБЕДА → СЛЕД.") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 800);
-        }
+        let currentSystem = "solar";
+        let currentPlanetsData = systemsData.solar.planets;
         
-        // ---------- ГЕОМЕТРИЯ ПЛАНЕТ (пересоздание с множителем) ----------
-        function isOnContinent(lat, lon) {
-            if (lat > 25 && lat < 75 && ((lon > -20 && lon < 60) || (lon > 60 && lon < 140))) return true;
-            if (lat > -35 && lat < 35 && lon > -20 && lon < 50) return true;
-            if (lat > 15 && lat < 65 && lon > -170 && lon < -60) return true;
-            if (lat > -55 && lat < 15 && lon > -80 && lon < -35) return true;
-            if (lat > -40 && lat < -10 && lon > 110 && lon < 155) return true;
-            return false;
+        // Эффект ауры для центральной звезды (создаётся отдельно)
+        let glowSphere = null;
+        
+        function createGlow(radius, colorIntensity) {
+            // просто большая полупрозрачная сфера с эффектом свечения
+            const geometry = new THREE.SphereGeometry(radius * 1.3, 32, 32);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffaa66,
+                transparent: true,
+                opacity: 0.15,
+                side: THREE.BackSide
+            });
+            const sphere = new THREE.Mesh(geometry, material);
+            return sphere;
         }
         
         function createPlanet(data, qualityFactor) {
@@ -270,11 +221,11 @@
             const positions = new Float32Array(count * 3);
             const colors = new Float32Array(count * 3);
             const radius = data.radius;
-            const isEarth = (data.name === "ЗЕМЛЯ");
-            const isSaturn = (data.name === "САТУРН");
+            const isEarthLike = (data.name === "ЗЕМЛЯ" && currentSystem === "solar");
+            const isSaturnLike = data.hasRings === true;
             for (let i = 0; i < count; i++) {
                 let x, y, z;
-                if (isSaturn && Math.random() < 0.4) {
+                if (isSaturnLike && Math.random() < 0.4) {
                     const ringRad = radius * 1.8 + Math.random() * radius * 1.2;
                     const angleRing = Math.random() * Math.PI * 2;
                     x = ringRad * Math.cos(angleRing);
@@ -290,13 +241,18 @@
                 }
                 positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
                 let col;
-                if (isEarth) {
+                if (isEarthLike) {
                     const theta2 = Math.atan2(y, x);
                     const phi2 = Math.acos(z / Math.hypot(x, y, z));
                     const lat = (Math.PI/2 - phi2) * 180 / Math.PI;
                     let lon = theta2 * 180 / Math.PI;
                     if (lon > 180) lon -= 360;
-                    col = isOnContinent(lat, lon) ? new THREE.Color(0x44cc44) : new THREE.Color(0x3388ff);
+                    const isLand = (lat > 25 && lat < 75 && ((lon > -20 && lon < 60) || (lon > 60 && lon < 140))) ||
+                                   (lat > -35 && lat < 35 && lon > -20 && lon < 50) ||
+                                   (lat > 15 && lat < 65 && lon > -170 && lon < -60) ||
+                                   (lat > -55 && lat < 15 && lon > -80 && lon < -35) ||
+                                   (lat > -40 && lat < -10 && lon > 110 && lon < 155);
+                    col = isLand ? new THREE.Color(0x44cc44) : new THREE.Color(0x3388ff);
                 } else if (data.isSun) {
                     const mix = Math.random();
                     col = new THREE.Color().setHSL(0.12, 1.0, 0.5 + mix * 0.3);
@@ -311,11 +267,11 @@
             geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
             const material = new THREE.PointsMaterial({ size: 0.4, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true });
             const planet = new THREE.Points(geom, material);
-            // позиция будет установлена позже, при регенерации
             return planet;
         }
         
         function createMoonQuality(qualityFactor) {
+            if (currentSystem !== "solar") return null;
             const baseCount = 4000;
             const count = Math.floor(baseCount * qualityFactor);
             if (count < 100) return null;
@@ -342,7 +298,7 @@
         
         function createStarsQuality(qualityFactor) {
             const baseCount = 6000;
-            const count = Math.floor(baseCount * Math.min(1, qualityFactor * 1.2)); // звёзды можно уменьшать чуть меньше
+            const count = Math.floor(baseCount * Math.min(1, qualityFactor * 1.2));
             if (count < 200) return null;
             const starPos = [];
             for (let i = 0; i < count; i++) {
@@ -360,103 +316,123 @@
             return stars;
         }
         
-        // ---------- ПЕРЕСОЗДАНИЕ ВСЕЙ СЦЕНЫ С НОВЫМ КАЧЕСТВОМ ----------
-        function regenerateWithQuality(quality) {
-            // Сохраняем текущие позиции планет и углы орбит
-            const oldPlanetsData = {};
-            for (let name in planets) {
-                if (planets[name] && planets[name].userData) {
-                    oldPlanetsData[name] = { angle: planets[name].userData.angle, distance: planets[name].userData.distance, speed: planets[name].userData.speed };
-                }
+        // Глобальные переменные
+        let scene, camera, renderer;
+        let planets = {};
+        let moonParticles = null;
+        let starField = null;
+        let targetPositions = {};
+        let currentTargetIdx = 0;
+        let currentTarget = "";
+        let cameraDistance = 55;
+        let targetDistance = 55;
+        let cameraPhi = 0, cameraTheta = 0.6;
+        let controlMode = "gesture";
+        let mouseLeftDown = false, lastMouseX = 0, lastMouseY = 0;
+        let mouseRotSpeed = { x: 0, y: 0 };
+        let targetRot = { x: 0, y: 0 }, currentRot = { x: 0, y: 0 };
+        let pinch = 0, targetPinch = 0;
+        let systemVisible = true, targetOpacity = 1.0, currentOpacity = 1.0;
+        let allObjects = [];
+        let moonAngle = 0;
+        const moonOrbitRadius = 6, moonSpeed = 0.025;
+        let isSwitching = false, switchTimer = 0, switchDuration = 1.5;
+        let startCamPos = new THREE.Vector3(), endTargetPos = new THREE.Vector3(), startDist = cameraDistance, startPhi = cameraPhi, startTheta = cameraTheta;
+        let lastGestureTime = 0, lastDetectedGesture = "none";
+        let currentQuality = 1.0, frustumCullingEnabled = true;
+        
+        // Эффект конца вселенной (не трогаем)
+        let universeEnded = false, explosionProgress = 0, explosionObjects = [], explosionDuration = 2.0, explosionTimer = 0;
+        
+        // --- АУРА ---
+        let auraGroup = null;
+        function createAuraForStar(planetObj, radius, color) {
+            if (auraGroup) {
+                scene.remove(auraGroup);
+                auraGroup = null;
             }
-            const oldMoonAngle = moonAngle;
-            // Удаляем всё из сцены и из списков
+            const group = new THREE.Group();
+            const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.2, side: THREE.BackSide });
+            const innerGlow = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.2, 32, 32), glowMat);
+            const outerGlow = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.6, 32, 32), glowMat);
+            outerGlow.material.opacity = 0.1;
+            group.add(innerGlow);
+            group.add(outerGlow);
+            planetObj.add(group);
+            return group;
+        }
+        
+        function regenerateWithOptions() {
+            const oldAngles = {};
+            for (let name in planets) {
+                if (planets[name] && planets[name].userData) oldAngles[name] = planets[name].userData.angle;
+            }
             for (let obj of allObjects) scene.remove(obj);
             allObjects = [];
             planets = {};
             if (moonParticles) scene.remove(moonParticles);
             if (starField) scene.remove(starField);
+            if (auraGroup && auraGroup.parent) scene.remove(auraGroup);
+            auraGroup = null;
             
-            // Создаём звёзды
-            starField = createStarsQuality(quality);
-            if (starField) {
-                scene.add(starField);
-                allObjects.push(starField);
-            }
+            starField = createStarsQuality(currentQuality);
+            if (starField) { scene.add(starField); allObjects.push(starField); }
             
-            // Создаём планеты
-            for (let tpl of planetsDataTemplate) {
-                const planet = createPlanet(tpl, quality);
+            const planetNamesList = [];
+            for (let tpl of currentPlanetsData) {
+                const planet = createPlanet(tpl, currentQuality);
                 if (!planet) continue;
-                // восстанавливаем угол, если был
-                let angle = Math.random() * Math.PI * 2;
-                let dist = tpl.distance;
-                let spd = tpl.speed;
-                if (oldPlanetsData[tpl.name]) {
-                    angle = oldPlanetsData[tpl.name].angle;
-                    dist = oldPlanetsData[tpl.name].distance;
-                    spd = oldPlanetsData[tpl.name].speed;
-                }
-                const x = Math.cos(angle) * dist;
-                const z = Math.sin(angle) * dist;
+                let angle = oldAngles[tpl.name] !== undefined ? oldAngles[tpl.name] : Math.random() * Math.PI * 2;
+                const x = Math.cos(angle) * tpl.distance;
+                const z = Math.sin(angle) * tpl.distance;
                 planet.position.set(x, 0, z);
-                planet.userData = { distance: dist, speed: spd, angle: angle };
+                planet.userData = { distance: tpl.distance, speed: tpl.speed, angle: angle };
                 scene.add(planet);
                 planets[tpl.name] = planet;
                 targetPositions[tpl.name] = new THREE.Vector3(x, 0, z);
                 allObjects.push(planet);
-            }
-            // Создаём Луну
-            moonParticles = createMoonQuality(quality);
-            if (moonParticles) {
-                scene.add(moonParticles);
-                allObjects.push(moonParticles);
-                targetPositions["ЛУНА"] = new THREE.Vector3(0, 0, 0);
-                moonAngle = oldMoonAngle;
-            }
-            // Применяем frustum culling
-            applyFrustumCulling();
-        }
-        
-        function applyFrustumCulling() {
-            for (let obj of allObjects) {
-                if (obj && obj.isPoints) {
-                    obj.frustumCulled = frustumCullingEnabled;
+                planetNamesList.push(tpl.name);
+                
+                // Создаём ауру для звезды, если параметр aura true
+                if (tpl.aura) {
+                    createAuraForStar(planet, tpl.radius, tpl.color[0]);
                 }
             }
-        }
-        
-        // ---------- ОСТАЛЬНЫЕ ФУНКЦИИ (updateOrbits, setTarget, жесты и т.д.) ----------
-        function updateOrbits() {
-            if (universeEnded) return;
-            for (let [name, planet] of Object.entries(planets)) {
-                if (name === "СОЛНЦЕ") continue;
-                if (!planet.userData) continue;
-                const data = planet.userData;
-                data.angle += data.speed;
-                const x = Math.cos(data.angle) * data.distance;
-                const z = Math.sin(data.angle) * data.distance;
-                planet.position.set(x, 0, z);
-                targetPositions[name].set(x, 0, z);
+            
+            moonParticles = createMoonQuality(currentQuality);
+            if (moonParticles) {
+                scene.add(moonParticles); allObjects.push(moonParticles);
+                targetPositions["ЛУНА"] = new THREE.Vector3(0,0,0);
+                moonAngle = oldAngles["ЛУНА"] || 0;
+            } else {
+                delete targetPositions["ЛУНА"];
             }
+            
+            updatePlanetButtons(planetNamesList);
+            if (!planets[currentTarget] && planetNamesList.length) {
+                setTarget(planetNamesList[0]);
+            } else if (planets[currentTarget]) {
+                document.getElementById('target-name').innerText = currentTarget;
+            }
+            applyFrustumCulling();
+            setSystemVisible(systemVisible);
         }
         
-        function updateMoon() {
-            if (universeEnded) return;
-            if (!planets["ЗЕМЛЯ"] || !moonParticles) return;
-            const earthPos = planets["ЗЕМЛЯ"].position;
-            moonAngle += moonSpeed;
-            const x = earthPos.x + Math.cos(moonAngle) * moonOrbitRadius;
-            const z = earthPos.z + Math.sin(moonAngle) * moonOrbitRadius;
-            const y = earthPos.y;
-            moonParticles.position.set(x, y, z);
-            targetPositions["ЛУНА"].set(x, y, z);
+        function updatePlanetButtons(planetNamesList) {
+            const container = document.getElementById('planet-buttons');
+            container.innerHTML = '';
+            planetNamesList.forEach(name => {
+                const btn = document.createElement('button');
+                btn.innerText = name;
+                btn.onclick = () => setTarget(name);
+                container.appendChild(btn);
+            });
         }
         
         function setTarget(name) {
             if (universeEnded) return;
             if (isSwitching || !targetPositions[name]) return;
-            const idx = planetNames.indexOf(name);
+            const idx = currentPlanetsData.findIndex(p => p.name === name);
             if (idx !== -1) currentTargetIdx = idx;
             startCamPos = camera.position.clone();
             endTargetPos = targetPositions[name].clone();
@@ -486,6 +462,31 @@
                 targetRot.x = 0; targetRot.y = 0;
                 mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
             }
+        }
+        
+        function updateOrbits() {
+            if (universeEnded) return;
+            for (let [name, planet] of Object.entries(planets)) {
+                if (!planet.userData) continue;
+                const data = planet.userData;
+                data.angle += data.speed;
+                const x = Math.cos(data.angle) * data.distance;
+                const z = Math.sin(data.angle) * data.distance;
+                planet.position.set(x, 0, z);
+                targetPositions[name].set(x, 0, z);
+            }
+        }
+        
+        function updateMoon() {
+            if (universeEnded) return;
+            if (!moonParticles || !planets["ЗЕМЛЯ"]) return;
+            const earthPos = planets["ЗЕМЛЯ"].position;
+            moonAngle += moonSpeed;
+            const x = earthPos.x + Math.cos(moonAngle) * moonOrbitRadius;
+            const z = earthPos.z + Math.sin(moonAngle) * moonOrbitRadius;
+            const y = earthPos.y;
+            moonParticles.position.set(x, y, z);
+            targetPositions["ЛУНА"].set(x, y, z);
         }
         
         function updateCamera(dt) {
@@ -519,13 +520,10 @@
         
         function updateVisibility(dt) {
             if (universeEnded) return;
-            const eps = 0.02;
-            if (Math.abs(currentOpacity - targetOpacity) > eps) {
+            if (Math.abs(currentOpacity - targetOpacity) > 0.02) {
                 currentOpacity += (targetOpacity - currentOpacity) * 0.15;
             } else currentOpacity = targetOpacity;
-            for (let obj of allObjects) {
-                if (obj.material) obj.material.opacity = currentOpacity;
-            }
+            for (let obj of allObjects) if (obj.material) obj.material.opacity = currentOpacity;
             document.getElementById('visible-indicator').innerText = targetOpacity > 0.5 ? "ДА" : "НЕТ";
         }
         
@@ -536,68 +534,83 @@
             targetOpacity = visible ? 1.0 : 0.0;
         }
         
-        // ---------- ЭФФЕКТ КОНЦА ВСЕЛЕННОЙ ----------
-        let universeEnded = false;
-        let explosionProgress = 0;
-        let explosionObjects = [];
-        let explosionDuration = 2.0;
-        let explosionTimer = 0;
+        // ----- жесты -----
+        function isVictoryGesture(lm) {
+            const idxEx = lm[8].y < lm[6].y;
+            const midEx = lm[12].y < lm[10].y;
+            const rinF = lm[16].y > lm[14].y;
+            const pinF = lm[20].y > lm[18].y;
+            const thF = Math.abs(lm[4].x - lm[2].x) < 0.07;
+            return idxEx && midEx && rinF && pinF && thF;
+        }
+        function detectOpenPalmAndFist(lm) {
+            const wrist = lm[0]; let avg = 0, ext = 0;
+            for (let t of [4,8,12,16,20]) {
+                const d = Math.hypot(lm[t].x-wrist.x, lm[t].y-wrist.y);
+                avg += d; if (d>0.22) ext++;
+            }
+            avg /= 5;
+            if (ext>=4 && avg>0.28) return "open";
+            if (ext<=1 && avg<0.18) return "fist";
+            return "unknown";
+        }
+        function nextPlanet() {
+            if (universeEnded) return;
+            const next = (currentTargetIdx + 1) % currentPlanetsData.length;
+            setTarget(currentPlanetsData[next].name);
+            document.getElementById('gesture-name').innerHTML = "✌️ ПОБЕДА";
+            setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "✌️ ПОБЕДА") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 800);
+        }
         
+        // ---- Эффект конца вселенной (оставлен) ----
         function startUniverseEnd() {
             if (universeEnded) return;
             universeEnded = true;
-            explosionProgress = 0;
-            explosionTimer = 0;
+            explosionProgress = 0; explosionTimer = 0;
             explosionObjects = [];
             for (let obj of allObjects) {
                 if (obj.geometry && obj.geometry.attributes.position) {
-                    const posAttr = obj.geometry.attributes.position.array;
-                    const count = obj.geometry.attributes.position.count;
-                    for (let i = 0; i < count; i++) {
-                        const ix = i * 3;
-                        const startPos = new THREE.Vector3(posAttr[ix], posAttr[ix+1], posAttr[ix+2]);
-                        explosionObjects.push({ obj, index: i, startPos, targetPos: new THREE.Vector3(0,0,0), velocity: null, done: false });
+                    const arr = obj.geometry.attributes.position.array;
+                    const cnt = obj.geometry.attributes.position.count;
+                    for (let i=0;i<cnt;i++) {
+                        const ix = i*3;
+                        const s = new THREE.Vector3(arr[ix], arr[ix+1], arr[ix+2]);
+                        explosionObjects.push({ obj, index: i, startPos: s, targetPos: new THREE.Vector3(0,0,0), velocity: null, done: false });
                     }
                 }
             }
             document.getElementById('gesture-name').innerHTML = "💥 КОНЕЦ ВСЕЛЕННОЙ 💥";
         }
-        
         function updateExplosion(dt) {
             if (!universeEnded) return;
             explosionTimer += dt;
-            if (explosionProgress === 0) {
-                const t = Math.min(1, explosionTimer / explosionDuration);
-                for (let item of explosionObjects) {
-                    if (item.done) continue;
-                    const newPos = item.startPos.clone().lerp(item.targetPos, t);
-                    const posAttr = item.obj.geometry.attributes.position.array;
-                    posAttr[item.index*3] = newPos.x;
-                    posAttr[item.index*3+1] = newPos.y;
-                    posAttr[item.index*3+2] = newPos.z;
+            if (explosionProgress===0) {
+                let t = Math.min(1, explosionTimer / explosionDuration);
+                for (let it of explosionObjects) {
+                    if (it.done) continue;
+                    const n = it.startPos.clone().lerp(it.targetPos, t);
+                    const arr = it.obj.geometry.attributes.position.array;
+                    arr[it.index*3] = n.x; arr[it.index*3+1] = n.y; arr[it.index*3+2] = n.z;
                 }
-                if (t >= 1) {
-                    explosionProgress = 1;
-                    explosionTimer = 0;
-                    for (let item of explosionObjects) {
+                if (t>=1) {
+                    explosionProgress = 1; explosionTimer = 0;
+                    for (let it of explosionObjects) {
                         const dir = new THREE.Vector3((Math.random()-0.5)*2, (Math.random()-0.5)*2, (Math.random()-0.5)*2).normalize();
-                        const speed = 20 + Math.random() * 30;
-                        item.velocity = dir.multiplyScalar(speed);
+                        const sp = 20+Math.random()*30;
+                        it.velocity = dir.multiplyScalar(sp);
                     }
                 }
-            } else if (explosionProgress === 1) {
+            } else if (explosionProgress===1) {
                 let allGone = true;
-                for (let item of explosionObjects) {
-                    if (item.done) continue;
-                    const posAttr = item.obj.geometry.attributes.position.array;
-                    const offset = item.velocity.clone().multiplyScalar(explosionTimer);
-                    posAttr[item.index*3] = offset.x;
-                    posAttr[item.index*3+1] = offset.y;
-                    posAttr[item.index*3+2] = offset.z;
-                    if (Math.abs(offset.x) > 500 && Math.abs(offset.y) > 500 && Math.abs(offset.z) > 500) item.done = true;
-                    else allGone = false;
+                for (let it of explosionObjects) {
+                    if (it.done) continue;
+                    const arr = it.obj.geometry.attributes.position.array;
+                    const off = it.velocity.clone().multiplyScalar(explosionTimer);
+                    arr[it.index*3] = off.x; arr[it.index*3+1] = off.y; arr[it.index*3+2] = off.z;
+                    if (Math.abs(off.x)>500 && Math.abs(off.y)>500 && Math.abs(off.z)>500) it.done=true;
+                    else allGone=false;
                 }
-                for (let obj of allObjects) { if (obj.geometry && obj.geometry.attributes.position) obj.geometry.attributes.position.needsUpdate = true; }
+                for (let obj of allObjects) if (obj.geometry && obj.geometry.attributes.position) obj.geometry.attributes.position.needsUpdate = true;
                 if (allGone) {
                     for (let obj of allObjects) scene.remove(obj);
                     universeEnded = false;
@@ -605,181 +618,140 @@
                     document.getElementById('gesture-name').innerHTML = "💀 НИЧЕГО НЕ ОСТАЛОСЬ 💀";
                 }
             }
-            if (explosionProgress === 0) {
-                for (let obj of allObjects) { if (obj.geometry && obj.geometry.attributes.position) obj.geometry.attributes.position.needsUpdate = true; }
-            }
+            if (explosionProgress===0) for (let obj of allObjects) if (obj.geometry && obj.geometry.attributes.position) obj.geometry.attributes.position.needsUpdate = true;
         }
         
-        // ---------- MEDIAPIPE ----------
-        const video = document.getElementById('video-input');
-        const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        let bothHandsOpenDetected = false, bothHandsOpenTimer = 0, victoryCooldown = 0;
+        function applyFrustumCulling() {
+            for (let obj of allObjects) if (obj && obj.isPoints) obj.frustumCulled = frustumCullingEnabled;
+        }
         
-        hands.onResults((res) => {
-            const handSpan = document.getElementById('hand-status');
-            const gestureSpan = document.getElementById('gesture-name');
-            if (controlMode !== "gesture") { handSpan.innerText = "ОТКЛЮЧЕНО"; handSpan.style.color = "#888"; gestureSpan.innerText = "—"; return; }
-            if (universeEnded) { handSpan.innerText = "КОНЕЦ"; handSpan.style.color = "#f00"; return; }
-            if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
-                handSpan.innerText = "ЗАХВАЧЕНО"; handSpan.style.color = "#0f0";
-                const lm = res.multiHandLandmarks[0];
-                const palm = lm[9];
-                targetRot.x = (palm.x - 0.5) * 1.8;
-                targetRot.y = (palm.y - 0.5) * 1.6;
-                const thumb = lm[4], index = lm[8];
-                const dist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-                let p = 0;
-                if (dist < 0.05) p = 1;
-                else if (dist > 0.15) p = 0;
-                else p = 1 - (dist - 0.05) / 0.1;
-                targetDistance = 55 - p * 40;
-                targetDistance = Math.min(Math.max(targetDistance, 15), 80);
-                
-                const now = Date.now();
-                const victory = isVictoryGesture(lm);
-                const palmFist = detectOpenPalmAndFist(lm);
-                let gestureDisplay = "—";
-                if (victory && now - victoryCooldown > 700) { nextPlanet(); victoryCooldown = now; gestureDisplay = "✌️ ПОБЕДА"; }
-                else if (palmFist === "open") { gestureDisplay = "🖐️ ЛАДОНЬ"; if (lastDetectedGesture !== "open" && now - lastGestureTime > 400) { setSystemVisible(true); lastGestureTime = now; } }
-                else if (palmFist === "fist") { gestureDisplay = "✊ КУЛАК"; if (lastDetectedGesture !== "fist" && now - lastGestureTime > 400) { setSystemVisible(false); lastGestureTime = now; } }
-                else { gestureDisplay = "🤷 НЕПОНЯТНО"; }
-                lastDetectedGesture = gestureDisplay;
-                gestureSpan.innerText = gestureDisplay;
-                
-                // Две ладони – конец вселенной
-                if (res.multiHandLandmarks.length >= 2) {
-                    const hand1 = res.multiHandLandmarks[0], hand2 = res.multiHandLandmarks[1];
-                    const g1 = detectOpenPalmAndFist(hand1), g2 = detectOpenPalmAndFist(hand2);
-                    if (g1 === "open" && g2 === "open") {
-                        if (!bothHandsOpenDetected) { bothHandsOpenDetected = true; bothHandsOpenTimer = now; }
-                        if (now - bothHandsOpenTimer > 500 && !universeEnded) { startUniverseEnd(); gestureSpan.innerHTML = "💥 ДВЕ ЛАДОНИ → КОНЕЦ"; handSpan.innerHTML = "АКТИВАЦИЯ"; }
-                    } else { bothHandsOpenDetected = false; }
-                }
-            } else { handSpan.innerText = "ПОИСК..."; handSpan.style.color = "#f66"; targetRot.x = 0; targetRot.y = 0; gestureSpan.innerText = "—"; lastDetectedGesture = "none"; victoryCooldown = 0; }
-        });
-        new Camera(video, { onFrame: async () => await hands.send({image:video}), width:640, height:480 }).start();
-        
-        // ---------- МЫШЬ ----------
-        function onMouseDown(e) { if (controlMode === "mouse") { mouseLeftDown = true; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
-        function onMouseMove(e) { if (controlMode === "mouse" && mouseLeftDown && !universeEnded) { mouseRotSpeed.x = (e.clientX - lastMouseX) * 0.008; mouseRotSpeed.y = (e.clientY - lastMouseY) * 0.008; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
-        function onMouseUp() { mouseLeftDown = false; }
-        function onWheel(e) { if (controlMode === "mouse" && !universeEnded) { targetDistance = Math.min(Math.max(targetDistance + (e.deltaY > 0 ? 2 : -2), 15), 80); e.preventDefault(); } }
-        
-        function makeButtons() {
-            const container = document.getElementById('planet-buttons');
-            planetNames.forEach(n => {
-                const btn = document.createElement('button');
-                btn.innerText = n === "СОЛНЦЕ" ? "☀️ СОЛНЦЕ" : n;
-                btn.onclick = () => setTarget(n);
-                container.appendChild(btn);
-            });
+        // ----- настройки и UI -----
+        function initSettings() {
+            const panel = document.getElementById('settings-panel');
+            const btnSet = document.getElementById('settings-btn');
+            const qualitySel = document.getElementById('quality-select');
+            const systemSel = document.getElementById('system-select');
+            const frustumChk = document.getElementById('frustum-culling');
+            btnSet.onclick = () => { if (panel.style.display==='none' || !panel.style.display) panel.style.display='flex'; else panel.style.display='none'; };
+            qualitySel.onchange = (e) => { currentQuality = parseFloat(e.target.value); regenerateWithOptions(); };
+            systemSel.onchange = (e) => {
+                const newSys = e.target.value;
+                if (newSys === currentSystem) return;
+                currentSystem = newSys;
+                currentPlanetsData = systemsData[currentSystem].planets;
+                document.getElementById('hud').style.borderLeftColor = (currentSystem==='solar') ? "#0f0" : "#f80";
+                currentTargetIdx = 0;
+                currentTarget = currentPlanetsData[0].name;
+                regenerateWithOptions();
+            };
+            frustumChk.onchange = (e) => { frustumCullingEnabled = e.target.checked; applyFrustumCulling(); };
         }
         
         function setControlMode(mode) {
             controlMode = mode;
             document.getElementById('mode-indicator').innerText = mode === "gesture" ? "ЖЕСТЫ" : "МЫШЬ";
             if (mode === "mouse") {
-                document.getElementById('hand-status').innerText = "ОТКЛЮЧЕНО";
+                document.getElementById('hand-status').innerHTML = "ОТКЛЮЧЕНО";
                 document.getElementById('hand-status').style.color = "#888";
-                document.getElementById('gesture-name').innerText = "—";
+                document.getElementById('gesture-name').innerHTML = "—";
             } else {
-                document.getElementById('hand-status').innerText = "ПОИСК...";
+                document.getElementById('hand-status').innerHTML = "ПОИСК...";
                 document.getElementById('hand-status').style.color = "#f66";
             }
-            mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
-            targetRot.x = 0; targetRot.y = 0;
-            currentRot.x = 0; currentRot.y = 0;
         }
         
-        // ---------- НАСТРОЙКИ ----------
-        function initSettings() {
-            const settingsPanel = document.getElementById('settings-panel');
-            const settingsBtn = document.getElementById('settings-btn');
-            const qualitySelect = document.getElementById('quality-select');
-            const frustumCheck = document.getElementById('frustum-culling');
-            
-            settingsBtn.addEventListener('click', () => {
-                if (settingsPanel.style.display === 'none' || !settingsPanel.style.display)
-                    settingsPanel.style.display = 'flex';
-                else settingsPanel.style.display = 'none';
-            });
-            
-            qualitySelect.addEventListener('change', (e) => {
-                const newQuality = parseFloat(e.target.value);
-                currentQuality = newQuality;
-                regenerateWithQuality(currentQuality);
-                applyFrustumCulling();
-                // также обновляем видимость, если она была выключена
-                if (!systemVisible) setSystemVisible(false);
-                else setSystemVisible(true);
-            });
-            
-            frustumCheck.addEventListener('change', (e) => {
-                frustumCullingEnabled = e.target.checked;
-                applyFrustumCulling();
-            });
-        }
-        
-        // ---------- FULLSCREEN ----------
-        const fullBtn = document.getElementById('fullscreen-btn');
-        fullBtn.addEventListener('click', () => {
-            if (!document.fullscreenElement) { document.documentElement.requestFullscreen(); fullBtn.style.opacity = '0.5'; }
-            else { document.exitFullscreen(); fullBtn.style.opacity = '1'; }
+        // --- MediaPipe ---
+        const vid = document.getElementById('video-input');
+        const handsPipe = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+        handsPipe.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+        let bothHandsOpen = false, bothTimer = 0, victoryCD = 0;
+        handsPipe.onResults((res) => {
+            const hSpan = document.getElementById('hand-status');
+            const gSpan = document.getElementById('gesture-name');
+            if (controlMode !== "gesture") { hSpan.innerText = "ОТКЛЮЧЕНО"; hSpan.style.color="#888"; gSpan.innerText="—"; return; }
+            if (universeEnded) { hSpan.innerText = "КОНЕЦ"; hSpan.style.color="#f00"; return; }
+            if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
+                hSpan.innerText = "ЗАХВАЧЕНО"; hSpan.style.color="#0f0";
+                const lm = res.multiHandLandmarks[0];
+                const palm = lm[9];
+                targetRot.x = (palm.x-0.5)*1.8; targetRot.y = (palm.y-0.5)*1.6;
+                const thumb = lm[4], idx = lm[8];
+                const d = Math.hypot(thumb.x-idx.x, thumb.y-idx.y);
+                let p = 0; if (d<0.05) p=1; else if(d>0.15) p=0; else p=1-(d-0.05)/0.1;
+                targetDistance = 55 - p*40; targetDistance = Math.min(Math.max(targetDistance,15),80);
+                const now = Date.now();
+                const victory = isVictoryGesture(lm);
+                const pf = detectOpenPalmAndFist(lm);
+                let gdisp = "—";
+                if (victory && now-victoryCD>700) { nextPlanet(); victoryCD=now; gdisp="✌️ ПОБЕДА"; }
+                else if (pf==="open") { gdisp="🖐️ ЛАДОНЬ"; if (lastDetectedGesture!=="open" && now-lastGestureTime>400) { setSystemVisible(true); lastGestureTime=now; } }
+                else if (pf==="fist") { gdisp="✊ КУЛАК"; if (lastDetectedGesture!=="fist" && now-lastGestureTime>400) { setSystemVisible(false); lastGestureTime=now; } }
+                else gdisp="🤷 НЕПОНЯТНО";
+                lastDetectedGesture = gdisp; gSpan.innerText = gdisp;
+                if (res.multiHandLandmarks.length>=2) {
+                    const g1 = detectOpenPalmAndFist(res.multiHandLandmarks[0]);
+                    const g2 = detectOpenPalmAndFist(res.multiHandLandmarks[1]);
+                    if (g1==="open" && g2==="open") {
+                        if (!bothHandsOpen) { bothHandsOpen=true; bothTimer=now; }
+                        if (now-bothTimer>500 && !universeEnded) { startUniverseEnd(); gSpan.innerHTML="💥 ДВЕ ЛАДОНИ → КОНЕЦ"; hSpan.innerHTML="АКТИВАЦИЯ"; }
+                    } else bothHandsOpen=false;
+                }
+            } else {
+                hSpan.innerText = "ПОИСК..."; hSpan.style.color="#f66";
+                targetRot.x=0; targetRot.y=0; gSpan.innerText="—";
+                lastDetectedGesture="none"; victoryCD=0;
+            }
         });
-        document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) fullBtn.style.opacity = '1'; });
+        new Camera(vid, { onFrame: async () => await handsPipe.send({image:vid}), width:640, height:480 }).start();
         
-        document.getElementById('control-mode').addEventListener('click', () => {
-            setControlMode(controlMode === "gesture" ? "mouse" : "gesture");
-        });
+        // --- мышь ---
+        function onMouseDown(e) { if (controlMode==="mouse") { mouseLeftDown=true; lastMouseX=e.clientX; lastMouseY=e.clientY; } }
+        function onMouseMove(e) { if (controlMode==="mouse" && mouseLeftDown && !universeEnded) { mouseRotSpeed.x=(e.clientX-lastMouseX)*0.008; mouseRotSpeed.y=(e.clientY-lastMouseY)*0.008; lastMouseX=e.clientX; lastMouseY=e.clientY; } }
+        function onMouseUp() { mouseLeftDown=false; }
+        function onWheel(e) { if (controlMode==="mouse" && !universeEnded) { targetDistance = Math.min(Math.max(targetDistance+(e.deltaY>0?2:-2),15),80); e.preventDefault(); } }
         
-        // ---------- INIT ----------
+        // --- fullscreen ---
+        const full = document.getElementById('fullscreen-btn');
+        full.addEventListener('click',()=>{ if(!document.fullscreenElement) { document.documentElement.requestFullscreen(); full.style.opacity='0.5'; } else { document.exitFullscreen(); full.style.opacity='1'; } });
+        document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement) full.style.opacity='1'; });
+        document.getElementById('control-mode').addEventListener('click',()=>{ setControlMode(controlMode==="gesture"?"mouse":"gesture"); });
+        
+        // --- init ---
         async function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x030318);
             scene.fog = new THREE.FogExp2(0x030318, 0.0003);
             camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 20, cameraDistance);
+            camera.position.set(0,20,cameraDistance);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
-            
-            // начальная генерация с качеством 1.0 (максимум)
-            currentQuality = 1.0;
-            regenerateWithQuality(1.0);
-            makeButtons();
+            currentPlanetsData = systemsData.solar.planets;
+            currentTarget = currentPlanetsData[0].name;
+            regenerateWithOptions();
             initSettings();
-            
             renderer.domElement.addEventListener('mousedown', onMouseDown);
             window.addEventListener('mousemove', onMouseMove);
             window.addEventListener('mouseup', onMouseUp);
             renderer.domElement.addEventListener('wheel', onWheel);
-            window.addEventListener('resize', () => {
+            window.addEventListener('resize', ()=>{
                 camera.aspect = window.innerWidth/window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
-            
             let last = performance.now();
             function animate() {
                 const now = performance.now();
                 let dt = Math.min(0.033, (now-last)/1000);
                 last = now;
                 if (!universeEnded) {
-                    updateOrbits();
-                    updateMoon();
-                    updateSwitch(dt);
-                    updateCamera(dt);
-                    updateVisibility(dt);
-                } else {
-                    updateExplosion(dt);
-                }
+                    updateOrbits(); updateMoon(); updateSwitch(dt); updateCamera(dt); updateVisibility(dt);
+                } else updateExplosion(dt);
                 renderer.render(scene, camera);
                 requestAnimationFrame(animate);
             }
             animate();
         }
-        
         init();
     </script>
 </body>
