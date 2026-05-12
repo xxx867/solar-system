@@ -6,7 +6,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Солнечная система / Галактика Андромеда — аура и жесты</title>
+    <title>Солнечная система / Андромеда — предпросмотр со скелетом / камерой</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         #hud {
@@ -57,7 +57,7 @@
             border: 1px solid #0f0;
             border-radius: 12px;
             padding: 15px;
-            width: 240px;
+            width: 270px;
             z-index: 250;
             color: #0f0;
             font-family: monospace;
@@ -102,9 +102,23 @@
         }
         .hud-value { color: #ffaa44; }
         .gesture-value { color: #88ff88; }
+        /* Canvas для скелета / камеры — слева сверху */
+        #preview-canvas {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            height: 210px;
+            z-index: 200;
+            pointer-events: none;
+            border-radius: 12px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(0,255,0,0.3);
+        }
     </style>
     <script>
-        const APP_VERSION = "2025-05-12-v4"; // меняй при обновлении
+        const APP_VERSION = "2025-05-13-v7";
         const savedVersion = localStorage.getItem("solar_system_version");
         if (savedVersion !== APP_VERSION) {
             localStorage.setItem("solar_system_version", APP_VERSION);
@@ -148,6 +162,17 @@
                 <option value="andromeda">🌀 Галактика Андромеда</option>
             </select>
         </div>
+        <div class="quality-option">
+            <span>Режим предпросмотра:</span>
+            <select id="preview-mode">
+                <option value="skeleton">🦴 Скелет рук</option>
+                <option value="camera">📷 Вся камера</option>
+            </select>
+        </div>
+        <label>
+            <span>🔘 Показывать предпросмотр</span>
+            <input type="checkbox" id="toggle-preview" checked>
+        </label>
         <label>
             <span>🔘 Frustum Culling</span>
             <input type="checkbox" id="frustum-culling" checked>
@@ -156,6 +181,7 @@
     </div>
 
     <video id="video-input" style="display:none"></video>
+    <canvas id="preview-canvas" width="280" height="210"></canvas>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -164,7 +190,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 
     <script>
-        // ---------- ДАННЫЕ ДВУХ СИСТЕМ ----------
+        // ---------- ДАННЫЕ ДВУХ СИСТЕМ (100% как в вашем коде) ----------
         const systemsData = {
             solar: {
                 name: "Солнечная система",
@@ -199,22 +225,33 @@
         let currentSystem = "solar";
         let currentPlanetsData = systemsData.solar.planets;
         
-        // Эффект ауры для центральной звезды (создаётся отдельно)
-        let glowSphere = null;
+        let scene, camera, renderer;
+        let planets = {};
+        let moonParticles = null;
+        let starField = null;
+        let targetPositions = {};
+        let currentTargetIdx = 0;
+        let currentTarget = "";
+        let cameraDistance = 55;
+        let targetDistance = 55;
+        let cameraPhi = 0, cameraTheta = 0.6;
+        let controlMode = "gesture";
+        let mouseLeftDown = false, lastMouseX = 0, lastMouseY = 0;
+        let mouseRotSpeed = { x: 0, y: 0 };
+        let targetRot = { x: 0, y: 0 }, currentRot = { x: 0, y: 0 };
+        let pinch = 0, targetPinch = 0;
+        let systemVisible = true, targetOpacity = 1.0, currentOpacity = 1.0;
+        let allObjects = [];
+        let moonAngle = 0;
+        const moonOrbitRadius = 6, moonSpeed = 0.025;
+        let isSwitching = false, switchTimer = 0, switchDuration = 1.5;
+        let startCamPos = new THREE.Vector3(), endTargetPos = new THREE.Vector3(), startDist = cameraDistance, startPhi = cameraPhi, startTheta = cameraTheta;
+        let lastGestureTime = 0, lastDetectedGesture = "none";
+        let currentQuality = 1.0, frustumCullingEnabled = true;
+        let universeEnded = false, explosionProgress = 0, explosionObjects = [], explosionDuration = 2.0, explosionTimer = 0;
+        let auraGroup = null;
         
-        function createGlow(radius, colorIntensity) {
-            // просто большая полупрозрачная сфера с эффектом свечения
-            const geometry = new THREE.SphereGeometry(radius * 1.3, 32, 32);
-            const material = new THREE.MeshBasicMaterial({
-                color: 0xffaa66,
-                transparent: true,
-                opacity: 0.15,
-                side: THREE.BackSide
-            });
-            const sphere = new THREE.Mesh(geometry, material);
-            return sphere;
-        }
-        
+        // ---- Геометрические функции (без изменений) ----
         function createPlanet(data, qualityFactor) {
             const count = Math.floor(data.baseParticles * qualityFactor);
             if (count < 100) return null;
@@ -316,60 +353,23 @@
             return stars;
         }
         
-        // Глобальные переменные
-        let scene, camera, renderer;
-        let planets = {};
-        let moonParticles = null;
-        let starField = null;
-        let targetPositions = {};
-        let currentTargetIdx = 0;
-        let currentTarget = "";
-        let cameraDistance = 55;
-        let targetDistance = 55;
-        let cameraPhi = 0, cameraTheta = 0.6;
-        let controlMode = "gesture";
-        let mouseLeftDown = false, lastMouseX = 0, lastMouseY = 0;
-        let mouseRotSpeed = { x: 0, y: 0 };
-        let targetRot = { x: 0, y: 0 }, currentRot = { x: 0, y: 0 };
-        let pinch = 0, targetPinch = 0;
-        let systemVisible = true, targetOpacity = 1.0, currentOpacity = 1.0;
-        let allObjects = [];
-        let moonAngle = 0;
-        const moonOrbitRadius = 6, moonSpeed = 0.025;
-        let isSwitching = false, switchTimer = 0, switchDuration = 1.5;
-        let startCamPos = new THREE.Vector3(), endTargetPos = new THREE.Vector3(), startDist = cameraDistance, startPhi = cameraPhi, startTheta = cameraTheta;
-        let lastGestureTime = 0, lastDetectedGesture = "none";
-        let currentQuality = 1.0, frustumCullingEnabled = true;
-        
-        // Эффект конца вселенной (не трогаем)
-        let universeEnded = false, explosionProgress = 0, explosionObjects = [], explosionDuration = 2.0, explosionTimer = 0;
-        
-        // --- АУРА ---
-        let auraGroup = null;
         function createAuraForStar(planetObj, radius, color) {
-            if (auraGroup) {
-                scene.remove(auraGroup);
-                auraGroup = null;
-            }
+            if (auraGroup) { scene.remove(auraGroup); auraGroup = null; }
             const group = new THREE.Group();
             const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.2, side: THREE.BackSide });
             const innerGlow = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.2, 32, 32), glowMat);
             const outerGlow = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.6, 32, 32), glowMat);
             outerGlow.material.opacity = 0.1;
-            group.add(innerGlow);
-            group.add(outerGlow);
+            group.add(innerGlow); group.add(outerGlow);
             planetObj.add(group);
             return group;
         }
         
         function regenerateWithOptions() {
             const oldAngles = {};
-            for (let name in planets) {
-                if (planets[name] && planets[name].userData) oldAngles[name] = planets[name].userData.angle;
-            }
+            for (let name in planets) if (planets[name] && planets[name].userData) oldAngles[name] = planets[name].userData.angle;
             for (let obj of allObjects) scene.remove(obj);
-            allObjects = [];
-            planets = {};
+            allObjects = []; planets = {};
             if (moonParticles) scene.remove(moonParticles);
             if (starField) scene.remove(starField);
             if (auraGroup && auraGroup.parent) scene.remove(auraGroup);
@@ -392,11 +392,7 @@
                 targetPositions[tpl.name] = new THREE.Vector3(x, 0, z);
                 allObjects.push(planet);
                 planetNamesList.push(tpl.name);
-                
-                // Создаём ауру для звезды, если параметр aura true
-                if (tpl.aura) {
-                    createAuraForStar(planet, tpl.radius, tpl.color[0]);
-                }
+                if (tpl.aura) createAuraForStar(planet, tpl.radius, tpl.color[0]);
             }
             
             moonParticles = createMoonQuality(currentQuality);
@@ -404,16 +400,11 @@
                 scene.add(moonParticles); allObjects.push(moonParticles);
                 targetPositions["ЛУНА"] = new THREE.Vector3(0,0,0);
                 moonAngle = oldAngles["ЛУНА"] || 0;
-            } else {
-                delete targetPositions["ЛУНА"];
-            }
+            } else delete targetPositions["ЛУНА"];
             
             updatePlanetButtons(planetNamesList);
-            if (!planets[currentTarget] && planetNamesList.length) {
-                setTarget(planetNamesList[0]);
-            } else if (planets[currentTarget]) {
-                document.getElementById('target-name').innerText = currentTarget;
-            }
+            if (!planets[currentTarget] && planetNamesList.length) setTarget(planetNamesList[0]);
+            else if (planets[currentTarget]) document.getElementById('target-name').innerText = currentTarget;
             applyFrustumCulling();
             setSystemVisible(systemVisible);
         }
@@ -438,8 +429,7 @@
             endTargetPos = targetPositions[name].clone();
             startDist = cameraDistance;
             startPhi = cameraPhi; startTheta = cameraTheta;
-            isSwitching = true;
-            switchTimer = 0;
+            isSwitching = true; switchTimer = 0;
             window._pending = name;
             document.getElementById('target-name').innerText = name;
         }
@@ -458,8 +448,7 @@
             if (t >= 1) {
                 isSwitching = false;
                 currentTarget = window._pending;
-                currentRot.x = 0; currentRot.y = 0;
-                targetRot.x = 0; targetRot.y = 0;
+                currentRot.x = 0; currentRot.y = 0; targetRot.x = 0; targetRot.y = 0;
                 mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
             }
         }
@@ -502,8 +491,7 @@
             } else if (controlMode === "mouse") {
                 cameraPhi += mouseRotSpeed.x * dt * 1.8;
                 cameraTheta += mouseRotSpeed.y * dt * 1.5;
-                mouseRotSpeed.x *= 0.95;
-                mouseRotSpeed.y *= 0.95;
+                mouseRotSpeed.x *= 0.95; mouseRotSpeed.y *= 0.95;
                 cameraDistance += (targetDistance - cameraDistance) * 0.12;
             }
             cameraTheta = Math.max(0.05, Math.min(Math.PI - 0.05, cameraTheta));
@@ -534,7 +522,7 @@
             targetOpacity = visible ? 1.0 : 0.0;
         }
         
-        // ----- жесты -----
+        // ----- жесты (без изменений) -----
         function isVictoryGesture(lm) {
             const idxEx = lm[8].y < lm[6].y;
             const midEx = lm[12].y < lm[10].y;
@@ -562,7 +550,7 @@
             setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "✌️ ПОБЕДА") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 800);
         }
         
-        // ---- Эффект конца вселенной (оставлен) ----
+        // ---- Конец вселенной (оставлен) ----
         function startUniverseEnd() {
             if (universeEnded) return;
             universeEnded = true;
@@ -625,13 +613,17 @@
             for (let obj of allObjects) if (obj && obj.isPoints) obj.frustumCulled = frustumCullingEnabled;
         }
         
-        // ----- настройки и UI -----
+        // ----- настройки -----
         function initSettings() {
             const panel = document.getElementById('settings-panel');
             const btnSet = document.getElementById('settings-btn');
             const qualitySel = document.getElementById('quality-select');
             const systemSel = document.getElementById('system-select');
             const frustumChk = document.getElementById('frustum-culling');
+            const previewModeSel = document.getElementById('preview-mode');
+            const togglePreview = document.getElementById('toggle-preview');
+            const previewCanvas = document.getElementById('preview-canvas');
+            
             btnSet.onclick = () => { if (panel.style.display==='none' || !panel.style.display) panel.style.display='flex'; else panel.style.display='none'; };
             qualitySel.onchange = (e) => { currentQuality = parseFloat(e.target.value); regenerateWithOptions(); };
             systemSel.onchange = (e) => {
@@ -645,6 +637,10 @@
                 regenerateWithOptions();
             };
             frustumChk.onchange = (e) => { frustumCullingEnabled = e.target.checked; applyFrustumCulling(); };
+            togglePreview.onchange = (e) => {
+                if (e.target.checked) previewCanvas.style.display = "block";
+                else previewCanvas.style.display = "none";
+            };
         }
         
         function setControlMode(mode) {
@@ -660,16 +656,105 @@
             }
         }
         
-        // --- MediaPipe ---
-        const vid = document.getElementById('video-input');
+        // --- MediaPipe с отрисовкой скелета или камеры + выключатель ---
+        const videoEl = document.getElementById('video-input');
         const handsPipe = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-        handsPipe.setOptions({ maxNumHands:2, modelComplexity:1, minDetectionConfidence:0.5, minTrackingConfidence:0.5 });
+        handsPipe.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        
         let bothHandsOpen = false, bothTimer = 0, victoryCD = 0;
+        const previewCanvas = document.getElementById('preview-canvas');
+        const ctx = previewCanvas.getContext('2d');
+        
+        const HAND_CONNECTIONS = [
+            [0,1],[1,2],[2,3],[3,4],
+            [0,5],[5,6],[6,7],[7,8],
+            [0,9],[9,10],[10,11],[11,12],
+            [0,13],[13,14],[14,15],[15,16],
+            [0,17],[17,18],[18,19],[19,20],
+            [5,9],[9,13],[13,17]
+        ];
+        
+        function drawSkeletonAllHands(landmarksArray) {
+            ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.translate(-previewCanvas.width, 0);
+            for (let idx = 0; idx < landmarksArray.length; idx++) {
+                const landmarks = landmarksArray[idx];
+                const isRightHand = idx === 0;
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = isRightHand ? "#00ff00" : "#33ccff";
+                ctx.fillStyle = isRightHand ? "#ff0000" : "#ffaa33";
+                for (let conn of HAND_CONNECTIONS) {
+                    const p1 = landmarks[conn[0]];
+                    const p2 = landmarks[conn[1]];
+                    if (p1 && p2) {
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x * previewCanvas.width, p1.y * previewCanvas.height);
+                        ctx.lineTo(p2.x * previewCanvas.width, p2.y * previewCanvas.height);
+                        ctx.stroke();
+                    }
+                }
+                for (let lm of landmarks) {
+                    ctx.beginPath();
+                    ctx.arc(lm.x * previewCanvas.width, lm.y * previewCanvas.height, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                const wrist = landmarks[0];
+                ctx.fillStyle = isRightHand ? "#00ff00" : "#33ccff";
+                ctx.font = "bold 14px monospace";
+                ctx.fillText(isRightHand ? "R" : "L", wrist.x * previewCanvas.width - 15, wrist.y * previewCanvas.height - 10);
+            }
+            ctx.restore();
+        }
+        
+        function drawCameraPreview() {
+            if (videoEl.videoWidth) {
+                ctx.drawImage(videoEl, 0, 0, previewCanvas.width, previewCanvas.height);
+            } else {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+                ctx.fillStyle = '#0f0';
+                ctx.font = '12px monospace';
+                ctx.fillText('Камера не активна', 20, 40);
+            }
+        }
+        
         handsPipe.onResults((res) => {
             const hSpan = document.getElementById('hand-status');
             const gSpan = document.getElementById('gesture-name');
-            if (controlMode !== "gesture") { hSpan.innerText = "ОТКЛЮЧЕНО"; hSpan.style.color="#888"; gSpan.innerText="—"; return; }
-            if (universeEnded) { hSpan.innerText = "КОНЕЦ"; hSpan.style.color="#f00"; return; }
+            const previewMode = document.getElementById('preview-mode').value;
+            const previewEnabled = document.getElementById('toggle-preview').checked;
+            const previewCanvasElem = document.getElementById('preview-canvas');
+            
+            if (previewEnabled) {
+                if (previewMode === "skeleton") {
+                    if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+                        drawSkeletonAllHands(res.multiHandLandmarks);
+                    } else {
+                        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+                        ctx.fillStyle = '#0f0';
+                        ctx.font = '12px monospace';
+                        ctx.fillText('Рука не обнаружена', 20, 40);
+                    }
+                } else { // camera mode
+                    drawCameraPreview();
+                }
+            } else {
+                ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            }
+            
+            // ОСНОВНАЯ ЛОГИКА УПРАВЛЕНИЯ (без изменений)
+            if (controlMode !== "gesture") { 
+                hSpan.innerText = "ОТКЛЮЧЕНО"; hSpan.style.color="#888"; gSpan.innerText="—"; 
+                return; 
+            }
+            if (universeEnded) { 
+                hSpan.innerText = "КОНЕЦ"; hSpan.style.color="#f00"; 
+                return; 
+            }
             if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
                 hSpan.innerText = "ЗАХВАЧЕНО"; hSpan.style.color="#0f0";
                 const lm = res.multiHandLandmarks[0];
@@ -702,7 +787,10 @@
                 lastDetectedGesture="none"; victoryCD=0;
             }
         });
-        new Camera(vid, { onFrame: async () => await handsPipe.send({image:vid}), width:640, height:480 }).start();
+        
+        // Запуск камеры
+        const cameraUtils = new Camera(videoEl, { onFrame: async () => await handsPipe.send({image:videoEl}), width:640, height:480 });
+        cameraUtils.start();
         
         // --- мышь ---
         function onMouseDown(e) { if (controlMode==="mouse") { mouseLeftDown=true; lastMouseX=e.clientX; lastMouseY=e.clientY; } }
@@ -711,9 +799,9 @@
         function onWheel(e) { if (controlMode==="mouse" && !universeEnded) { targetDistance = Math.min(Math.max(targetDistance+(e.deltaY>0?2:-2),15),80); e.preventDefault(); } }
         
         // --- fullscreen ---
-        const full = document.getElementById('fullscreen-btn');
-        full.addEventListener('click',()=>{ if(!document.fullscreenElement) { document.documentElement.requestFullscreen(); full.style.opacity='0.5'; } else { document.exitFullscreen(); full.style.opacity='1'; } });
-        document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement) full.style.opacity='1'; });
+        const fullBtn = document.getElementById('fullscreen-btn');
+        fullBtn.addEventListener('click',()=>{ if(!document.fullscreenElement) { document.documentElement.requestFullscreen(); fullBtn.style.opacity='0.5'; } else { document.exitFullscreen(); fullBtn.style.opacity='1'; } });
+        document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement) fullBtn.style.opacity='1'; });
         document.getElementById('control-mode').addEventListener('click',()=>{ setControlMode(controlMode==="gesture"?"mouse":"gesture"); });
         
         // --- init ---
@@ -739,6 +827,7 @@
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
+            
             let last = performance.now();
             function animate() {
                 const now = performance.now();
