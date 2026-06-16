@@ -528,8 +528,9 @@ body.menu-open { overflow: hidden; }
 }
 .stat-num {
   display: block;
-  font-family: var(--font-tech);
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 2.2rem; font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--sun);
 }
 .stat-label { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.05em; }

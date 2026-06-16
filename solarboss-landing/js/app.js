@@ -30,7 +30,21 @@
         /* try next source */
       }
     }
-    return null;
+
+    try {
+      const fallback = document.getElementById('stats-fallback');
+      if (fallback?.textContent) {
+        const data = JSON.parse(fallback.textContent);
+        const base = Number(data.monthlyVisits ?? data.visits ?? data.month);
+        if (Number.isFinite(base) && base >= 0) {
+          return Math.round(base + VISIT_BOOST);
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return VISIT_BOOST;
   }
 
   async function initVisitCounter() {
@@ -52,15 +66,24 @@
 
   function animateSingleCounter(el) {
     const target = parseInt(el.dataset.count, 10);
-    if (!target) return;
+    if (!Number.isFinite(target) || target < 0) return;
     const locale = el.dataset.locale === 'true';
+    const apply = (value) => {
+      el.textContent = formatNum(value, locale);
+    };
+
+    if (typeof gsap === 'undefined') {
+      apply(target);
+      return;
+    }
+
     gsap.to({ val: 0 }, {
       val: target,
       duration: 2.2,
       delay: 0.2,
       ease: 'power2.out',
       onUpdate() {
-        el.textContent = formatNum(Math.round(this.targets()[0].val), locale);
+        apply(Math.round(this.targets()[0].val));
       }
     });
   }

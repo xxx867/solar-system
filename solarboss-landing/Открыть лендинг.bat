@@ -1,3 +1,3 @@
 @echo off
 chcp 65001 >nul
-start "" "%~dp0index.html"
+start "" "https://solarboss.ru/solarboss-landing/index.html"
