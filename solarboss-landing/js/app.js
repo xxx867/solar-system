@@ -12,6 +12,8 @@
   let monthlyVisitsDisplay = null;
   let heroCountersReady = false;
   let visitCounterPromise = null;
+  let slides = [];
+  let currentSlide = 0;
 
   const ambientBase = () => document.querySelector('.ambient-base');
   const ambientGlow = () => document.querySelector('.ambient-glow');
@@ -52,15 +54,9 @@
     if (!el) return;
 
     monthlyVisitsDisplay = await loadMonthlyVisits();
-    if (monthlyVisitsDisplay !== null) {
-      el.dataset.count = String(monthlyVisitsDisplay);
-      el.textContent = '0';
-      if (heroCountersReady) {
-        animateSingleCounter(el);
-      }
-    } else {
-      el.textContent = '—';
-      el.dataset.count = '0';
+    el.dataset.count = String(monthlyVisitsDisplay);
+    if (heroCountersReady) {
+      animateSingleCounter(el);
     }
   }
 
@@ -88,60 +84,20 @@
     });
   }
 
-  function initPreloader() {
+  function finishBoot() {
     const preloader = document.getElementById('preloader');
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        preloader.classList.add('done');
-        initHeroAnimation();
-        showFullscreenGate();
-      }, 2000);
-    });
+    preloader?.classList.add('done');
+    initHeroAnimation();
   }
 
-  function requestFullscreen() {
-    if (document.fullscreenElement) return Promise.resolve();
-    const el = document.documentElement;
-    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
-    return req ? Promise.resolve(req.call(el)).catch(() => {}) : Promise.resolve();
-  }
-
-  function dismissFullscreenGate() {
-    const gate = document.getElementById('fullscreen-gate');
-    if (!gate || gate.classList.contains('hidden')) return;
-    gate.classList.add('hidden');
-    setTimeout(() => gate.remove(), 800);
-  }
-
-  function showFullscreenGate() {
-    const gate = document.getElementById('fullscreen-gate');
-    if (!gate) return;
-
-    gate.classList.add('visible');
-
-    const enter = async () => {
-      await requestFullscreen();
-      dismissFullscreenGate();
-    };
-
-    document.getElementById('enter-fullscreen')?.addEventListener('click', enter);
-    gate.addEventListener('click', (e) => {
-      if (e.target === gate || e.target.closest('.gate-inner')) enter();
-    });
-
-    const skipOnScroll = () => dismissFullscreenGate();
-    window.addEventListener('wheel', skipOnScroll, { once: true, passive: true });
-    window.addEventListener('touchstart', skipOnScroll, { once: true, passive: true });
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'F11') return;
-      if (!gate.classList.contains('visible')) return;
-      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        if (e.key === 'Enter' || e.key === ' ') enter();
-        else dismissFullscreenGate();
-      }
-    });
+  function initPreloader() {
+    const done = () => finishBoot();
+    if (document.readyState === 'complete') {
+      setTimeout(done, 600);
+    } else {
+      window.addEventListener('load', () => setTimeout(done, 600), { once: true });
+    }
+    setTimeout(done, 2500);
   }
 
   function parseHex(hex) {
@@ -200,10 +156,11 @@
   }
 
   function initColorAmbience() {
+    if (!slides.length) return;
     applyAmbience(getSlideTheme(slides[0]));
 
     const update = () => {
-      const scrollY = lenis ? lenis.scroll : window.scrollY;
+      const scrollY = window.scrollY;
       let idx = 0;
 
       for (let i = 0; i < slides.length - 1; i++) {
@@ -237,11 +194,7 @@
       });
     };
 
-    if (lenis) {
-      lenis.on('scroll', update);
-    } else {
-      window.addEventListener('scroll', update, { passive: true });
-    }
+    window.addEventListener('scroll', update, { passive: true });
     update();
   }
 
@@ -396,7 +349,6 @@
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeMenu();
-      if (document.getElementById('fullscreen-gate')?.classList.contains('visible')) return;
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
@@ -425,15 +377,7 @@
     if (index < 0 || index >= slides.length) return;
     currentSlide = index;
     const target = slides[index];
-    if (lenis) {
-      lenis.scrollTo(target, {
-        offset: 0,
-        duration: 1.8,
-        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      });
-    } else {
-      target.scrollIntoView({ behavior: 'smooth' });
-    }
+    target.scrollIntoView({ behavior: 'smooth' });
     updateNav(index);
     slides.forEach((s, i) => s.classList.toggle('active', i === index));
     animateSlideContent(target);
@@ -442,7 +386,8 @@
   function updateNav(index) {
     document.querySelectorAll('.nav-dot').forEach((d, i) => d.classList.toggle('active', i === index));
     document.querySelectorAll('.menu-list li').forEach((l, i) => l.classList.toggle('active', i === index));
-    document.querySelector('.progress-fill').style.width = `${((index + 1) / slides.length) * 100}%`;
+    const fill = document.querySelector('.progress-fill');
+    if (fill) fill.style.width = `${((index + 1) / slides.length) * 100}%`;
   }
 
   function initScrollObserver() {
@@ -474,6 +419,7 @@
   }
 
   function initGSAP() {
+    document.documentElement.classList.add('has-gsap');
     gsap.registerPlugin(ScrollTrigger);
     slides.forEach(slide => {
       gsap.set(slide.querySelectorAll('.reveal'), { opacity: 0, y: 40 });
@@ -490,12 +436,20 @@
     if (slide.dataset.animated) return;
     slide.dataset.animated = 'true';
 
-    gsap.to(slide.querySelectorAll('.reveal'), {
-      opacity: 1, y: 0,
-      duration: 0.9,
-      stagger: 0.1,
-      ease: 'power3.out'
-    });
+    const reveals = slide.querySelectorAll('.reveal');
+    if (typeof gsap === 'undefined') {
+      reveals.forEach((el) => {
+        el.style.opacity = '1';
+        el.style.transform = 'none';
+      });
+    } else {
+      gsap.to(reveals, {
+        opacity: 1, y: 0,
+        duration: 0.9,
+        stagger: 0.1,
+        ease: 'power3.out'
+      });
+    }
 
     if (slide.classList.contains('slide-hero')) {
       animateCounters(slide);
@@ -504,25 +458,33 @@
 
   function initHeroAnimation() {
     heroCountersReady = true;
-    gsap.to('.hero-title .line span', {
-      y: 0,
-      duration: 1.2,
-      stagger: 0.15,
-      ease: 'power4.out'
-    });
-    gsap.to('.hero-content .reveal', {
-      opacity: 1, y: 0,
-      duration: 0.9,
-      stagger: 0.12,
-      delay: 0.5,
-      ease: 'power3.out'
-    });
+
+    if (typeof gsap !== 'undefined') {
+      gsap.to('.hero-title .line span', {
+        y: 0,
+        duration: 1.2,
+        stagger: 0.15,
+        ease: 'power4.out'
+      });
+      gsap.to('.hero-content .reveal', {
+        opacity: 1, y: 0,
+        duration: 0.9,
+        stagger: 0.12,
+        delay: 0.5,
+        ease: 'power3.out'
+      });
+    } else {
+      document.querySelectorAll('.hero-title .line span, .hero-content .reveal').forEach((el) => {
+        el.style.opacity = '1';
+        el.style.transform = 'none';
+      });
+    }
 
     visitCounterPromise?.then(() => {
       const hero = document.querySelector('.slide-hero');
       hero?.querySelectorAll('.stat-num:not(#visit-counter)').forEach(el => animateSingleCounter(el));
       const visitEl = document.getElementById('visit-counter');
-      if (visitEl && monthlyVisitsDisplay !== null) animateSingleCounter(visitEl);
+      if (visitEl) animateSingleCounter(visitEl);
     });
   }
 
@@ -533,41 +495,27 @@
   function animateCounters(slide) {
     slide?.querySelectorAll('.stat-num').forEach(el => {
       if (el.id === 'visit-counter') {
-        if (monthlyVisitsDisplay !== null) animateSingleCounter(el);
+        animateSingleCounter(el);
         return;
       }
       animateSingleCounter(el);
     });
   }
 
-  function initLenis() {
-    lenis = new Lenis({
-      duration: 1.8,
-      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
-      wheelMultiplier: 0.85,
-    });
-
-    function raf(time) {
-      lenis.raf(time);
-      requestAnimationFrame(raf);
-    }
-    requestAnimationFrame(raf);
-
-    lenis.on('scroll', () => {
-      if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.update();
-    });
-  }
-
   function init() {
-    initPreloader();
-    initParticles();
-    initNavigation();
-    visitCounterPromise = initVisitCounter();
-    if (typeof Lenis !== 'undefined') initLenis();
-    slides = [...document.querySelectorAll('.slide')];
-    initColorAmbience();
-    if (typeof gsap !== 'undefined') initGSAP();
+    try {
+      slides = [...document.querySelectorAll('.slide')];
+      initPreloader();
+      initParticles();
+      initNavigation();
+      visitCounterPromise = initVisitCounter();
+      initColorAmbience();
+      if (typeof gsap !== 'undefined') initGSAP();
+      else animateSlideContent(slides[0]);
+    } catch (err) {
+      console.error('SolarBoss landing init failed:', err);
+      document.getElementById('preloader')?.classList.add('done');
+    }
   }
 
   if (document.readyState === 'loading') {
