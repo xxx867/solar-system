@@ -93,11 +93,11 @@
   function initPreloader() {
     const done = () => finishBoot();
     if (document.readyState === 'complete') {
-      setTimeout(done, 600);
+      setTimeout(done, 300);
     } else {
-      window.addEventListener('load', () => setTimeout(done, 600), { once: true });
+      window.addEventListener('load', () => setTimeout(done, 300), { once: true });
     }
-    setTimeout(done, 2500);
+    setTimeout(done, 1200);
   }
 
   function parseHex(hex) {
@@ -418,39 +418,29 @@
     document.body.classList.remove('menu-open');
   }
 
-  function initGSAP() {
-    document.documentElement.classList.add('has-gsap');
-    gsap.registerPlugin(ScrollTrigger);
-    slides.forEach(slide => {
-      gsap.set(slide.querySelectorAll('.reveal'), { opacity: 0, y: 40 });
-      ScrollTrigger.create({
-        trigger: slide,
-        start: 'top 70%',
-        onEnter: () => animateSlideContent(slide),
-        once: true
-      });
-    });
-  }
-
-  function animateSlideContent(slide) {
-    if (slide.dataset.animated) return;
-    slide.dataset.animated = 'true';
-
-    const reveals = slide.querySelectorAll('.reveal');
-    if (typeof gsap === 'undefined') {
-      reveals.forEach((el) => {
+  function revealAllSlides() {
+    slides.forEach((slide) => {
+      slide.querySelectorAll('.reveal, .hero-title .line span').forEach((el) => {
         el.style.opacity = '1';
         el.style.transform = 'none';
       });
-    } else {
-      gsap.to(reveals, {
-        opacity: 1, y: 0,
-        duration: 0.9,
-        stagger: 0.1,
-        ease: 'power3.out'
-      });
-    }
+      slide.dataset.animated = 'true';
+    });
+  }
 
+  function initGSAP() {
+    if (typeof ScrollTrigger !== 'undefined') {
+      gsap.registerPlugin(ScrollTrigger);
+    }
+  }
+
+  function animateSlideContent(slide) {
+    if (!slide || slide.dataset.animated) return;
+    slide.dataset.animated = 'true';
+    slide.querySelectorAll('.reveal, .hero-title .line span').forEach((el) => {
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+    });
     if (slide.classList.contains('slide-hero')) {
       animateCounters(slide);
     }
@@ -458,33 +448,11 @@
 
   function initHeroAnimation() {
     heroCountersReady = true;
-
-    if (typeof gsap !== 'undefined') {
-      gsap.to('.hero-title .line span', {
-        y: 0,
-        duration: 1.2,
-        stagger: 0.15,
-        ease: 'power4.out'
-      });
-      gsap.to('.hero-content .reveal', {
-        opacity: 1, y: 0,
-        duration: 0.9,
-        stagger: 0.12,
-        delay: 0.5,
-        ease: 'power3.out'
-      });
-    } else {
-      document.querySelectorAll('.hero-title .line span, .hero-content .reveal').forEach((el) => {
-        el.style.opacity = '1';
-        el.style.transform = 'none';
-      });
-    }
+    revealAllSlides();
 
     visitCounterPromise?.then(() => {
       const hero = document.querySelector('.slide-hero');
-      hero?.querySelectorAll('.stat-num:not(#visit-counter)').forEach(el => animateSingleCounter(el));
-      const visitEl = document.getElementById('visit-counter');
-      if (visitEl) animateSingleCounter(visitEl);
+      hero?.querySelectorAll('.stat-num').forEach(el => animateSingleCounter(el));
     });
   }
 
@@ -510,8 +478,8 @@
       initNavigation();
       visitCounterPromise = initVisitCounter();
       initColorAmbience();
+      revealAllSlides();
       if (typeof gsap !== 'undefined') initGSAP();
-      else animateSlideContent(slides[0]);
     } catch (err) {
       console.error('SolarBoss landing init failed:', err);
       document.getElementById('preloader')?.classList.add('done');
