@@ -36,6 +36,8 @@ jobs:
             echo "No changes"
             exit 0
           fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add stats.json solarboss-landing/stats.json || true
           git commit -m "chore: update metrika stats"
           git push
