@@ -178,8 +178,6 @@ body {
   letter-spacing: 0.12em;
 }
 
-body.is-immersive { overflow: hidden; }
-
 /* ===== PROGRESS & NAV DOTS ===== */
 .progress-bar {
   position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 1000;

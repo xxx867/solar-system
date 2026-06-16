@@ -106,6 +106,13 @@
     return req ? Promise.resolve(req.call(el)).catch(() => {}) : Promise.resolve();
   }
 
+  function dismissFullscreenGate() {
+    const gate = document.getElementById('fullscreen-gate');
+    if (!gate || gate.classList.contains('hidden')) return;
+    gate.classList.add('hidden');
+    setTimeout(() => gate.remove(), 800);
+  }
+
   function showFullscreenGate() {
     const gate = document.getElementById('fullscreen-gate');
     if (!gate) return;
@@ -114,9 +121,7 @@
 
     const enter = async () => {
       await requestFullscreen();
-      gate.classList.add('hidden');
-      document.body.classList.add('is-immersive');
-      setTimeout(() => gate.remove(), 800);
+      dismissFullscreenGate();
     };
 
     document.getElementById('enter-fullscreen')?.addEventListener('click', enter);
@@ -124,11 +129,17 @@
       if (e.target === gate || e.target.closest('.gate-inner')) enter();
     });
 
+    const skipOnScroll = () => dismissFullscreenGate();
+    window.addEventListener('wheel', skipOnScroll, { once: true, passive: true });
+    window.addEventListener('touchstart', skipOnScroll, { once: true, passive: true });
+
     document.addEventListener('keydown', (e) => {
       if (e.key === 'F11') return;
-      if (gate.classList.contains('visible') && (e.key === 'Enter' || e.key === ' ')) {
+      if (!gate.classList.contains('visible')) return;
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
-        enter();
+        if (e.key === 'Enter' || e.key === ' ') enter();
+        else dismissFullscreenGate();
       }
     });
   }
@@ -361,6 +372,7 @@
     slides = [...document.querySelectorAll('.slide')];
     const navDots = document.querySelector('.nav-dots');
     const menuList = document.querySelector('.menu-list');
+    if (!navDots || !menuList || !slides.length) return;
 
     slides.forEach((slide, i) => {
       const title = slide.dataset.title || `Раздел ${i + 1}`;
@@ -379,8 +391,8 @@
       menuList.appendChild(li);
     });
 
-    document.querySelector('.menu-toggle').addEventListener('click', toggleMenu);
-    document.querySelector('.menu-close').addEventListener('click', closeMenu);
+    document.querySelector('.menu-toggle')?.addEventListener('click', toggleMenu);
+    document.querySelector('.menu-close')?.addEventListener('click', closeMenu);
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeMenu();
