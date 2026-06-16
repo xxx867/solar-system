@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nissan Skyline — Интерактивная презентация</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="preloader">
+    <div class="preloader-inner">
+      <div class="preloader-ring"></div>
+      <div class="preloader-logo">SKYLINE</div>
+      <div class="preloader-bar"><span></span></div>
+      <p class="preloader-text">Загрузка легенды...</p>
+    </div>
+  </div>
+
+  <canvas id="particles"></canvas>
+  <div class="speed-lines" aria-hidden="true"></div>
+
+  <nav class="nav-dots" aria-label="Навигация по разделам"></nav>
+  <div class="progress-bar"><div class="progress-fill"></div></div>
+
+  <button class="menu-toggle" aria-label="Открыть меню">
+    <span></span><span></span><span></span>
+  </button>
+  <aside class="side-menu">
+    <div class="side-menu-header">
+      <span>SKYLINE</span>
+      <button class="menu-close" aria-label="Закрыть">&times;</button>
+    </div>
+    <ul class="menu-list"></ul>
+    <div class="menu-hint">↑ ↓ или колесо мыши</div>
+  </aside>
+
+  <main id="presentation">
+    <!-- HERO -->
+    <section class="slide slide-hero" data-title="Главная" data-theme="hero">
+      <div class="hero-bg">
+        <img src="../images/r34.jpg" alt="Nissan Skyline GT-R R34" class="hero-img">
+        <div class="hero-overlay"></div>
+      </div>
+      <div class="slide-content hero-content">
+        <p class="eyebrow reveal">Since 1957 · Japan</p>
+        <h1 class="hero-title">
+          <span class="line"><span>NISSAN</span></span>
+          <span class="line accent"><span>SKYLINE</span></span>
+        </h1>
+        <p class="hero-sub reveal">Легенда, которая переписала правила. От скромного седана — до культа мирового автоспорта.</p>
+        <div class="hero-actions reveal">
+          <button class="btn btn-primary" data-goto="history">Начать путешествие</button>
+          <button class="btn btn-ghost" data-goto="generations">Смотреть поколения</button>
+        </div>
+        <div class="hero-stats reveal">
+          <div class="stat"><span class="stat-num" data-count="65">0</span><span class="stat-label">лет истории</span></div>
+          <div class="stat"><span class="stat-num" data-count="52">0</span><span class="stat-label">гоночных побед R32</span></div>
+          <div class="stat"><span class="stat-num" data-count="280">0</span><span class="stat-label">л.с. легенды</span></div>
+        </div>
+      </div>
+      <div class="scroll-hint">
+        <span>Листайте</span>
+        <div class="scroll-mouse"></div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="slide slide-history" data-title="История" data-theme="dark">
+      <div class="slide-content">
+        <p class="section-tag reveal">Глава I</p>
+        <h2 class="section-title reveal">Путь к <em>легенде</em></h2>
+        <p class="section-desc reveal">От Prince Skyline 1957 года до рождения GT-R — история амбиций, инженерии и побед.</p>
+
+        <div class="timeline" role="list">
+          <div class="timeline-track">
+            <div class="timeline-progress"></div>
+          </div>
+          <article class="timeline-item active" data-year="1957" role="listitem">
+            <button class="timeline-dot" aria-label="1957"></button>
+            <div class="timeline-card">
+              <span class="year">1957</span>
+              <h3>Рождение Skyline</h3>
+              <p>Prince Motor Company представляет первый Skyline — премиальный японский седан.</p>
+            </div>
+          </article>
+          <article class="timeline-item" data-year="1969" role="listitem">
+            <button class="timeline-dot" aria-label="1969"></button>
+            <div class="timeline-card">
+              <span class="year">1969</span>
+              <h3>Первый GT-R</h3>
+              <p>Skyline 2000GT-R «Hakosuka» — 160 л.с. и 52 победы на гоночных трассах.</p>
+            </div>
+          </article>
+          <article class="timeline-item" data-year="1989" role="listitem">
+            <button class="timeline-dot" aria-label="1989"></button>
+            <div class="timeline-card">
+              <span class="year">1989</span>
+              <h3>Возрождение Godzilla</h3>
+              <p>R32 GT-R с RB26DETT и ATTESA E-TS — монстр, уничтоживший Group A.</p>
+            </div>
+          </article>
+          <article class="timeline-item" data-year="1999" role="listitem">
+            <button class="timeline-dot" aria-label="1999"></button>
+            <div class="timeline-card">
+              <span class="year">1999</span>
+              <h3>Культ R34</h3>
+              <p>Финальное поколение классического GT-R. Икона JDM и мировой поп-культуры.</p>
+            </div>
+          </article>
+          <article class="timeline-item" data-year="2007" role="listitem">
+            <button class="timeline-dot" aria-label="2007"></button>
+            <div class="timeline-card">
+              <span class="year">2007</span>
+              <h3>Эра R35</h3>
+              <p>GT-R становится самостоятельной моделью. VR38DETT и ручная сборка Takumi.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- GENERATIONS -->
+    <section class="slide slide-generations" data-title="Поколения" data-theme="dark">
+      <div class="slide-content">
+        <p class="section-tag reveal">Глава II</p>
+        <h2 class="section-title reveal">Поколения <em>GT-R</em></h2>
+        <p class="section-desc reveal">Наведите на карточку — узнайте характеристики. Кликните — переверните.</p>
+
+        <div class="gen-grid">
+          <article class="gen-card" data-gen="r32">
+            <div class="gen-card-inner">
+              <div class="gen-front">
+                <img src="../images/r32.jpg" alt="R32 GT-R">
+                <div class="gen-info">
+                  <span class="gen-era">1989–1994</span>
+                  <h3>R32 GT-R</h3>
+                  <p class="gen-nick">«Godzilla»</p>
+                </div>
+              </div>
+              <div class="gen-back">
+                <h3>R32 GT-R</h3>
+                <ul>
+                  <li><strong>Двигатель</strong> RB26DETT 2.6L</li>
+                  <li><strong>Мощность</strong> 280 л.с.</li>
+                  <li><strong>Привод</strong> ATTESA E-TS AWD</li>
+                  <li><strong>Особенность</strong> Super HICAS</li>
+                  <li><strong>Рекорд</strong> 29/29 побед Group A</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="gen-card" data-gen="r33">
+            <div class="gen-card-inner">
+              <div class="gen-front">
+                <img src="../images/r33.jpg" alt="R33 GT-R">
+                <div class="gen-info">
+                  <span class="gen-era">1995–1998</span>
+                  <h3>R33 GT-R</h3>
+                  <p class="gen-nick">Nürburgring Hunter</p>
+                </div>
+              </div>
+              <div class="gen-back">
+                <h3>R33 GT-R</h3>
+                <ul>
+                  <li><strong>Двигатель</strong> RB26DETT 2.6L</li>
+                  <li><strong>Мощность</strong> 280 л.с.</li>
+                  <li><strong>Привод</strong> ATTESA E-TS Pro</li>
+                  <li><strong>Рекорд</strong> Nürburgring &lt; 8 мин</li>
+                  <li><strong>Топ</strong> 400R — 400 л.с.</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="gen-card featured" data-gen="r34">
+            <div class="gen-card-inner">
+              <div class="gen-front">
+                <img src="../images/r34.jpg" alt="R34 GT-R">
+                <div class="gen-badge">ICON</div>
+                <div class="gen-info">
+                  <span class="gen-era">1999–2002</span>
+                  <h3>R34 GT-R</h3>
+                  <p class="gen-nick">Король JDM</p>
+                </div>
+              </div>
+              <div class="gen-back">
+                <h3>R34 GT-R</h3>
+                <ul>
+                  <li><strong>Двигатель</strong> RB26DETT 2.6L</li>
+                  <li><strong>Мощность</strong> 280 л.с.</li>
+                  <li><strong>Топ</strong> Nismo Z-Tune 500 л.с.</li>
+                  <li><strong>Особенность</strong> Мульти-дисплей</li>
+                  <li><strong>Культура</strong> Fast & Furious 2</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+
+          <article class="gen-card" data-gen="r35">
+            <div class="gen-card-inner">
+              <div class="gen-front">
+                <img src="../images/r35_gtr.jpg" alt="R35 GT-R">
+                <div class="gen-info">
+                  <span class="gen-era">2007–н.в.</span>
+                  <h3>R35 GT-R</h3>
+                  <p class="gen-nick">Суперкар</p>
+                </div>
+              </div>
+              <div class="gen-back">
+                <h3>R35 GT-R</h3>
+                <ul>
+                  <li><strong>Двигатель</strong> VR38DETT 3.8L V6</li>
+                  <li><strong>Мощность</strong> 570–600 л.с.</li>
+                  <li><strong>Сборка</strong> Master Takumi</li>
+                  <li><strong>0–100</strong> ~2.9 сек (Nismo)</li>
+                  <li><strong>Рекорд</strong> Nürburgring 7:08</li>
+                </ul>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ENGINE -->
+    <section class="slide slide-engine" data-title="Двигатель" data-theme="red">
+      <div class="engine-glow"></div>
+      <div class="slide-content engine-layout">
+        <div class="engine-text">
+          <p class="section-tag reveal">Глава III</p>
+          <h2 class="section-title reveal">Сердце легенды — <em>RB26DETT</em></h2>
+          <p class="section-desc reveal">Рядный 6-цилиндровый битурбо — один из величайших двигателей в истории автоспорта. Кованые коленвал и поршни, два параллельных турбокомпрессора, потенциал свыше 1000 л.с. в тюнинге.</p>
+          <div class="engine-specs reveal">
+            <div class="espec"><span>2.6L</span><small>Объём</small></div>
+            <div class="espec"><span>TT</span><small>Битурбо</small></div>
+            <div class="espec"><span>I6</span><small>Конфигурация</small></div>
+            <div class="espec"><span>24V</span><small>Клапана</small></div>
+          </div>
+        </div>
+        <div class="engine-visual reveal">
+          <div class="engine-block">
+            <div class="cylinder c1"></div>
+            <div class="cylinder c2"></div>
+            <div class="cylinder c3"></div>
+            <div class="cylinder c4"></div>
+            <div class="cylinder c5"></div>
+            <div class="cylinder c6"></div>
+            <div class="turbo t-left"></div>
+            <div class="turbo t-right"></div>
+            <div class="engine-label">RB26DETT</div>
+          </div>
+          <div class="rpm-gauge">
+            <svg viewBox="0 0 200 120">
+              <path class="gauge-bg" d="M20,100 A80,80 0 0,1 180,100"/>
+              <path class="gauge-fill" d="M20,100 A80,80 0 0,1 180,100"/>
+            </svg>
+            <span class="rpm-value">0</span>
+            <span class="rpm-label">x1000 RPM</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPARE -->
+    <section class="slide slide-compare" data-title="Сравнение" data-theme="dark">
+      <div class="slide-content">
+        <p class="section-tag reveal">Глава IV</p>
+        <h2 class="section-title reveal">Интерактивное <em>сравнение</em></h2>
+        <p class="section-desc reveal">Выберите модель — характеристики обновятся в реальном времени.</p>
+
+        <div class="compare-wrap reveal">
+          <div class="compare-tabs">
+            <button class="ctab active" data-model="r32">R32</button>
+            <button class="ctab" data-model="r33">R33</button>
+            <button class="ctab active-model" data-model="r34">R34</button>
+            <button class="ctab" data-model="r35">R35</button>
+          </div>
+          <div class="compare-display">
+            <div class="compare-image">
+              <img id="compare-img" src="../images/r34.jpg" alt="Сравнение моделей">
+            </div>
+            <div class="compare-bars">
+              <div class="bar-row" data-stat="power">
+                <span class="bar-label">Мощность</span>
+                <div class="bar-track"><div class="bar-fill" style="--val:28%"></div></div>
+                <span class="bar-value">280 л.с.</span>
+              </div>
+              <div class="bar-row" data-stat="torque">
+                <span class="bar-label">Крутящий момент</span>
+                <div class="bar-track"><div class="bar-fill" style="--val:65%"></div></div>
+                <span class="bar-value">400 Н·м</span>
+              </div>
+              <div class="bar-row" data-stat="weight">
+                <span class="bar-label">Масса</span>
+                <div class="bar-track"><div class="bar-fill" style="--val:70%"></div></div>
+                <span class="bar-value">1560 кг</span>
+              </div>
+              <div class="bar-row" data-stat="speed">
+                <span class="bar-label">Макс. скорость</span>
+                <div class="bar-track"><div class="bar-fill" style="--val:78%"></div></div>
+                <span class="bar-value">280 км/ч</span>
+              </div>
+              <div class="bar-row" data-stat="accel">
+                <span class="bar-label">Разгон 0–100</span>
+                <div class="bar-track"><div class="bar-fill" style="--val:85%"></div></div>
+                <span class="bar-value">4.8 сек</span>
+              </div>
+              <div class="bar-row" data-stat="icon">
+                <span class="bar-label">Культовость</span>
+                <div class="bar-track"><div class="bar-fill" style="--val:98%"></div></div>
+                <span class="bar-value">★★★★★</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CULTURE -->
+    <section class="slide slide-culture" data-title="Культура" data-theme="dark">
+      <div class="slide-content">
+        <p class="section-tag reveal">Глава V</p>
+        <h2 class="section-title reveal">Больше, чем <em>автомобиль</em></h2>
+        <p class="section-desc reveal">Skyline GT-R — символ целой эпохи. Кино, аниме, игры, уличные гонки.</p>
+
+        <div class="culture-grid reveal">
+          <article class="culture-card" data-tilt>
+            <div class="culture-icon">🎬</div>
+            <h3>Fast & Furious 2</h3>
+            <p>Серебристый R34 Брайана О'Коннера — машина мечты миллионов зрителей по всему миру.</p>
+          </article>
+          <article class="culture-card" data-tilt>
+            <div class="culture-icon">📺</div>
+            <h3>Initial D</h3>
+            <p>R32 GT-R в руках Сигэхиро Кунимото — культовый образ в легендарном аниме о дрифте.</p>
+          </article>
+          <article class="culture-card" data-tilt>
+            <div class="culture-icon">🎮</div>
+            <h3>Gran Turismo</h3>
+            <p>Skyline присутствует с первой части (1997). Для многих — первая встреча с GT-R.</p>
+          </article>
+          <article class="culture-card" data-tilt>
+            <div class="culture-icon">🏁</div>
+            <h3>JDM Culture</h3>
+            <p>Тюнинг, дрифт, стенс, Wangan — Skyline в центре каждого направления японского автоспорта.</p>
+          </article>
+        </div>
+
+        <blockquote class="culture-quote reveal">
+          <p>«На треке нет заменителя GT-R. На улице — тоже.»</p>
+        </blockquote>
+      </div>
+    </section>
+
+    <!-- V35 -->
+    <section class="slide slide-v35" data-title="Skyline" data-theme="light">
+      <div class="v35-bg">
+        <img src="../images/v35.jpg" alt="Nissan Skyline V35">
+      </div>
+      <div class="slide-content v35-content">
+        <p class="section-tag reveal">Эпилог</p>
+        <h2 class="section-title reveal">Skyline <em>сегодня</em></h2>
+        <p class="section-desc reveal">GT-R стал самостоятельной легендой, а линейка Skyline продолжает эволюцию — от V35 с V6-двигателем до современных гибридных версий.</p>
+        <div class="v35-facts reveal">
+          <div class="vfact"><strong>V35</strong><span>2001 — новая платформа FM</span></div>
+          <div class="vfact"><strong>V37</strong><span>2014 — гибрид и турбо</span></div>
+          <div class="vfact"><strong>GT-R</strong><span>Отдельная модель-флагман</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FINALE -->
+    <section class="slide slide-finale" data-title="Финал" data-theme="hero">
+      <div class="finale-bg"></div>
+      <div class="slide-content finale-content">
+        <h2 class="finale-title reveal">
+          <span>THE LEGEND</span>
+          <span class="accent">LIVES ON</span>
+        </h2>
+        <p class="finale-sub reveal">65+ лет. 5 поколений GT-R. Одна неугасимая страсть.</p>
+        <button class="btn btn-primary reveal" id="restart-btn">Пройти снова</button>
+        <p class="finale-credit reveal">Nissan Skyline — интерактивная презентация</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="keyboard-hint">← → ↑ ↓ навигация · Esc меню</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

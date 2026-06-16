@@ -1,0 +1,1276 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Солнечная система / Андромеда — жесты / мышь / сенсор</title>
+    <style>
+        :root{
+            --bg0:#050810;
+            --bg1:#070c17;
+            --glass: rgba(10, 16, 32, 0.55);
+            --glass2: rgba(10, 16, 32, 0.78);
+            --border: rgba(255,255,255,0.10);
+            --text: rgba(235,242,255,0.92);
+            --muted: rgba(170,185,215,0.70);
+            --hud: #00ff66; /* фирменный лайм */
+            --hud2: #ffaa44;
+            --ease: cubic-bezier(.22,1,.36,1);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            touch-action: none;
+            background: radial-gradient(1200px 700px at 30% 80%, rgba(255,170,68,0.10), transparent 60%),
+                        radial-gradient(900px 600px at 80% 30%, rgba(0,255,102,0.08), transparent 55%),
+                        linear-gradient(180deg, var(--bg1), var(--bg0));
+            color: var(--text);
+        }
+
+        .vignette{
+            position: fixed; inset: 0; pointer-events: none; z-index: 50;
+            background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.70) 100%);
+        }
+        .grain{
+            position: fixed; inset: 0; pointer-events: none; z-index: 51;
+            opacity: 0.035;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            animation: grainShift .55s steps(2) infinite;
+        }
+        @keyframes grainShift{ 0%,100%{ transform: translate(0,0);} 50%{ transform: translate(-1.2%,-0.8%);} }
+        #hud {
+            position: absolute; top: 20px; left: 20px;
+            background: linear-gradient(180deg, rgba(10,16,32,0.78), rgba(10,16,32,0.55));
+            border: 1px solid var(--border);
+            border-left: 3px solid rgba(0,255,102,0.85);
+            padding: 12px 14px;
+            color: var(--text);
+            font-size: 13px;
+            line-height: 1.35;
+            z-index: 100;
+            pointer-events: none;
+            backdrop-filter: blur(14px);
+            border-radius: 12px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        #controls {
+            position: absolute; bottom: 100px; left: 20px;
+            background: rgba(10,16,32,0.55);
+            border: 1px solid rgba(255,255,255,0.08);
+            padding: 8px 12px;
+            color: var(--muted);
+            font-size: 12px;
+            border-radius: 999px;
+            z-index: 100; pointer-events: none;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 14px 50px rgba(0,0,0,0.35);
+        }
+        .buttons {
+            position: absolute; bottom: 20px; left: 0; right: 0;
+            display: flex; justify-content: center; gap: 8px;
+            flex-wrap: wrap; z-index: 200; padding: 10px;
+            background: rgba(10,16,32,0.45);
+            border-top: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(14px);
+        }
+        button {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.10);
+            color: rgba(235,242,255,0.86);
+            padding: 9px 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px; cursor: pointer; border-radius: 10px;
+            transition: transform .25s var(--ease), background .25s var(--ease), border-color .25s var(--ease), box-shadow .25s var(--ease);
+            touch-action: manipulation;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            background: rgba(0,255,102,0.10);
+            border-color: rgba(0,255,102,0.30);
+            box-shadow: 0 12px 36px rgba(0,255,102,0.12);
+        }
+        button:active{ transform: translateY(0px) scale(0.98); }
+        .buttons button.is-active{
+            background: rgba(255,170,68,0.10);
+            border-color: rgba(255,170,68,0.35);
+            box-shadow: 0 0 0 1px rgba(255,170,68,0.10) inset, 0 14px 40px rgba(255,170,68,0.10);
+        }
+        .top-buttons {
+            position: absolute; top: 20px; right: 20px;
+            display: flex; gap: 10px;
+            z-index: 201;
+        }
+        .top-buttons button {
+            background: rgba(10,16,32,0.55);
+            border: 1px solid rgba(255,255,255,0.10);
+            color: rgba(235,242,255,0.92);
+            padding: 10px 14px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 12px;
+            touch-action: manipulation;
+            backdrop-filter: blur(14px);
+        }
+        #settings-panel {
+            position: absolute; top: 70px; right: 20px;
+            background: rgba(10,16,32,0.78); backdrop-filter: blur(18px);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 16px;
+            padding: 16px;
+            width: 280px;
+            z-index: 250;
+            color: rgba(235,242,255,0.92);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.55);
+            transform-origin: top right;
+            animation: panelIn .35s var(--ease) both;
+        }
+        @keyframes panelIn{ from{ opacity: 0; transform: translateY(-8px) scale(0.98);} to{ opacity: 1; transform: translateY(0) scale(1);} }
+        #settings-panel label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        #settings-panel select, #settings-panel input {
+            background: rgba(0,0,0,0.25);
+            color: rgba(235,242,255,0.92);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-family: monospace;
+            touch-action: manipulation;
+        }
+        .quality-option {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        .note {
+            font-size: 10px;
+            color: #aaa;
+            text-align: center;
+            margin-top: 5px;
+        }
+        #mode-switch {
+            position: absolute; top: 80px; right: 20px;
+            background: rgba(10,16,32,0.55); border: 1px solid rgba(255,255,255,0.10);
+            color: rgba(235,242,255,0.92); padding: 10px 14px;
+            font-family: monospace; font-size: 12px;
+            border-radius: 12px; cursor: pointer;
+            z-index: 200;
+            touch-action: manipulation;
+            backdrop-filter: blur(14px);
+        }
+        .hud-value { color: var(--hud2); }
+        .gesture-value { color: rgba(180, 255, 220, 0.92); }
+        #preview-canvas {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+            height: 210px;
+            z-index: 200;
+            pointer-events: none;
+            border-radius: 12px;
+            background: rgba(10,16,32,0.45);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.10);
+            box-shadow: 0 18px 60px rgba(0,0,0,0.4);
+        }
+
+        @media (max-width: 820px){
+            #hud{ top: 12px; left: 12px; }
+            #preview-canvas{ top: 12px; left: 12px; width: 220px; height: 165px; }
+            #controls{ left: 12px; bottom: 92px; }
+            .top-buttons{ top: 12px; right: 12px; }
+            #mode-switch{ top: 62px; right: 12px; }
+            #settings-panel{ right: 12px; top: 62px; width: min(320px, calc(100vw - 24px)); }
+        }
+    </style>
+    <script>
+        const APP_VERSION = "2025-05-15-v1";
+        const savedVersion = localStorage.getItem("solar_system_version");
+        if (savedVersion !== APP_VERSION) {
+            localStorage.setItem("solar_system_version", APP_VERSION);
+            window.location.reload(true);
+        }
+    </script>
+</head>
+<body>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <div id="hud">
+        🎯 ЦЕЛЬ: <span id="target-name" class="hud-value">СОЛНЦЕ</span><br>
+        ✋ РУКА: <span id="hand-status">ПОИСК...</span><br>
+        🕹️ РЕЖИМ: <span id="mode-indicator" class="hud-value">ЖЕСТЫ</span><br>
+        🌌 ВИДИМОСТЬ: <span id="visible-indicator" class="hud-value">ДА</span><br>
+        🤚 ЖЕСТ: <span id="gesture-name" class="gesture-value">—</span>
+    </div>
+    <div id="controls">
+        🖐️ ЛАДОНЬ → ПОКАЗАТЬ &nbsp;| ✊ КУЛАК → СКРЫТЬ &nbsp;| ✌️ ПОБЕДА → СЛЕД. ПЛАНЕТА
+    </div>
+    <div class="buttons" id="planet-buttons"></div>
+    <div class="top-buttons">
+        <button id="fullscreen-btn">⛶ ПОЛНЫЙ ЭКРАН</button>
+        <button id="settings-btn">⚙️ НАСТРОЙКИ</button>
+    </div>
+    <button id="mode-switch">🔘 РЕЖИМ: ЖЕСТЫ</button>
+
+    <div id="settings-panel">
+        <div style="text-align:center; margin-bottom:5px;">⚙️ НАСТРОЙКИ</div>
+        <div class="quality-option">
+            <span>Качество частиц:</span>
+            <select id="quality-select">
+                <option value="1.0">Максимум</option>
+                <option value="0.7">Высокое</option>
+                <option value="0.4">Среднее</option>
+                <option value="0.2">Низкое</option>
+            </select>
+        </div>
+        <div class="quality-option">
+            <span>Выбор системы:</span>
+            <select id="system-select">
+                <option value="solar">🌞 Солнечная система</option>
+                <option value="andromeda">🌀 Галактика Андромеда</option>
+            </select>
+        </div>
+        <div class="quality-option">
+            <span>Режим предпросмотра:</span>
+            <select id="preview-mode">
+                <option value="skeleton">🦴 Скелет рук</option>
+                <option value="camera">📷 Вся камера</option>
+            </select>
+        </div>
+        <label>
+            <span>🔘 Показывать предпросмотр</span>
+            <input type="checkbox" id="toggle-preview" checked>
+        </label>
+        <label>
+            <span>🔘 Frustum Culling</span>
+            <input type="checkbox" id="frustum-culling" checked>
+        </label>
+        <button id="enable-sound" style="background:#0f0; color:#000; margin-top:5px;">🔊 ВКЛЮЧИТЬ ЗВУК</button>
+        <div class="note">При низком качестве частиц<br>производительность выше</div>
+    </div>
+
+    <video id="video-input" style="display:none"></video>
+    <canvas id="preview-canvas" width="280" height="210"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function(m,e,t,r,i,k,a){
+            m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+            m[i].l=1*new Date();
+            for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+            k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+        })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=109886442', 'ym');
+
+        ym(109886442, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+    </script>
+    <noscript><div><img src="https://mc.yandex.ru/watch/109886442" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+    <!-- /Yandex.Metrika counter -->
+
+    <script>
+        // ========== ЗВУКИ (короткие эффекты, включаются кнопкой) ==========
+        let audioCtx = null;
+        let soundEnabled = false;
+        
+        function playSwitchSound() {
+            if (!audioCtx || !soundEnabled) return;
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = 1046.5;
+            gain.gain.value = 0.12;
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(now + 0.6);
+        }
+        
+        let lastRotSound = 0;
+        function playRotationSound(intensity) {
+            if (!audioCtx || !soundEnabled) return;
+            const now = audioCtx.currentTime;
+            if (now - lastRotSound < 0.08) return;
+            lastRotSound = now;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = 523.25 + intensity * 200;
+            gain.gain.value = 0.04 * Math.min(0.6, intensity);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(now + 0.2);
+        }
+        
+        function enableSound() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const silent = audioCtx.createOscillator();
+            const silentGain = audioCtx.createGain();
+            silentGain.gain.value = 0;
+            silent.connect(silentGain);
+            silentGain.connect(audioCtx.destination);
+            silent.start();
+            silent.stop(audioCtx.currentTime + 0.01);
+            soundEnabled = true;
+            const btn = document.getElementById('enable-sound');
+            btn.innerText = "🔊 ЗВУК АКТИВЕН";
+            btn.style.background = "#0f0";
+            btn.style.color = "#000";
+        }
+        document.getElementById('enable-sound').addEventListener('click', enableSound);
+        
+        // ---------- ДАННЫЕ ДВУХ СИСТЕМ ----------
+        const systemsData = {
+            solar: {
+                name: "Солнечная система",
+                planets: [
+                    { name: "СОЛНЦЕ", radius: 12, distance: 0, color: [0xffaa44, 0xff6644], baseParticles: 20000, isSun: true, speed: 0 },
+                    { name: "МЕРКУРИЙ", radius: 1.8, distance: 18, color: [0xaa8866], baseParticles: 3000, speed: 0.006 },
+                    { name: "ВЕНЕРА", radius: 2.2, distance: 25, color: [0xdd9988], baseParticles: 4000, speed: 0.0045 },
+                    { name: "ЗЕМЛЯ", radius: 2.5, distance: 32, color: [0x3388ff, 0x44cc44], baseParticles: 12000, speed: 0.0035 },
+                    { name: "МАРС", radius: 2.0, distance: 39, color: [0xcc6644], baseParticles: 4000, speed: 0.003 },
+                    { name: "ЮПИТЕР", radius: 5.5, distance: 52, color: [0xd2b48c], baseParticles: 15000, speed: 0.002 },
+                    { name: "САТУРН", radius: 4.8, distance: 68, color: [0xd2b48c, 0xc2b280], baseParticles: 18000, speed: 0.0015, hasRings: true },
+                    { name: "УРАН", radius: 3.5, distance: 82, color: [0x88ccff], baseParticles: 8000, speed: 0.0012 },
+                    { name: "НЕПТУН", radius: 3.5, distance: 96, color: [0x3366aa], baseParticles: 8000, speed: 0.001 }
+                ]
+            },
+            andromeda: {
+                name: "Галактика Андромеда",
+                planets: [
+                    { name: "АРКТУР", radius: 14, distance: 0, color: [0xffaa66, 0xffaa88], baseParticles: 22000, isSun: true, speed: 0, aura: true },
+                    { name: "АУРИГА", radius: 2.4, distance: 21, color: [0xaa66ff, 0xcc88ff], baseParticles: 3800, speed: 0.0068, aura: false },
+                    { name: "НЕБУЛА", radius: 2.6, distance: 29, color: [0x44ccdd, 0x88ddff], baseParticles: 4800, speed: 0.0052, aura: false },
+                    { name: "ЭФИР", radius: 3.2, distance: 37, color: [0x88aaff, 0xaaccff], baseParticles: 12000, speed: 0.004, aura: false },
+                    { name: "ФАНТОМ", radius: 2.2, distance: 45, color: [0x9999cc, 0xbbbbee], baseParticles: 4200, speed: 0.0033, aura: false },
+                    { name: "ВУЛКАН", radius: 5.8, distance: 59, color: [0xff6644, 0xff8866], baseParticles: 16000, speed: 0.0025, aura: false },
+                    { name: "ТЕРРА-НОВА", radius: 5.0, distance: 75, color: [0x66cc66, 0x88ff88], baseParticles: 18000, speed: 0.0019, hasRings: true, aura: false },
+                    { name: "ЛЕДЯНОЙ ГОЛИАФ", radius: 3.6, distance: 89, color: [0x88ccff, 0xaaffff], baseParticles: 8000, speed: 0.0015, aura: false },
+                    { name: "КСАНТАР", radius: 3.6, distance: 103, color: [0xffcc66, 0xffdd88], baseParticles: 8000, speed: 0.0012, aura: false }
+                ]
+            }
+        };
+        
+        let currentSystem = "solar";
+        let currentPlanetsData = systemsData.solar.planets;
+        
+        let scene, camera, renderer;
+        let planets = {};
+        let moonParticles = null;
+        let starField = null;
+        let targetPositions = {};
+        let currentTargetIdx = 0;
+        let currentTarget = "";
+        let cameraDistance = 55;
+        let targetDistance = 55;
+        let cameraPhi = 0, cameraTheta = 0.6;
+        let controlMode = "gesture"; // "gesture", "mouse", "touch"
+        let mouseLeftDown = false, lastMouseX = 0, lastMouseY = 0;
+        let mouseRotSpeed = { x: 0, y: 0 };
+        let targetRot = { x: 0, y: 0 }, currentRot = { x: 0, y: 0 };
+        let pinch = 0, targetPinch = 0;
+        let systemVisible = true, targetOpacity = 1.0, currentOpacity = 1.0;
+        let allObjects = [];
+        let moonAngle = 0;
+        const moonOrbitRadius = 6, moonSpeed = 0.025;
+        let isSwitching = false, switchTimer = 0, switchDuration = 1.5;
+        let startCamPos = new THREE.Vector3(), endTargetPos = new THREE.Vector3(), startDist = cameraDistance, startPhi = cameraPhi, startTheta = cameraTheta;
+        let lastGestureTime = 0, lastDetectedGesture = "none";
+        let currentQuality = 1.0, frustumCullingEnabled = true;
+        let universeEnded = false, explosionProgress = 0, explosionObjects = [], explosionDuration = 2.0, explosionTimer = 0;
+        let auraGroup = null;
+        
+        // Сенсорное управление
+        let touchStartDist = 0;
+        let initialCameraDistance = 0;
+        let lastTouchX = 0, lastTouchY = 0;
+        let touchRotSpeed = { x: 0, y: 0 };
+        let touchActive = false;
+
+        // ---- ТЕКСТУРА ДЛЯ ЧАСТИЦ (круглые точки вместо квадратов) ----
+        function createDotTexture() {
+            const c = document.createElement('canvas');
+            c.width = 128; c.height = 128;
+            const g = c.getContext('2d');
+            const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+            grad.addColorStop(0.0, 'rgba(255,255,255,1)');
+            grad.addColorStop(0.35, 'rgba(255,255,255,0.95)');
+            grad.addColorStop(0.75, 'rgba(255,255,255,0.25)');
+            grad.addColorStop(1.0, 'rgba(255,255,255,0)');
+            g.fillStyle = grad;
+            g.beginPath();
+            g.arc(64, 64, 64, 0, Math.PI * 2);
+            g.fill();
+            const tex = new THREE.CanvasTexture(c);
+            tex.needsUpdate = true;
+            return tex;
+        }
+        
+        // ---- ГЕОМЕТРИЧЕСКИЕ ФУНКЦИИ (создание планет) ----
+        function createPlanet(data, qualityFactor) {
+            const count = Math.floor(data.baseParticles * qualityFactor);
+            if (count < 100) return null;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const radius = data.radius;
+            const isEarthLike = (data.name === "ЗЕМЛЯ" && currentSystem === "solar");
+            const isSaturnLike = data.hasRings === true;
+            for (let i = 0; i < count; i++) {
+                let x, y, z;
+                if (isSaturnLike && Math.random() < 0.4) {
+                    const ringRad = radius * 1.8 + Math.random() * radius * 1.2;
+                    const angleRing = Math.random() * Math.PI * 2;
+                    x = ringRad * Math.cos(angleRing);
+                    z = ringRad * Math.sin(angleRing);
+                    y = (Math.random() - 0.5) * 0.8;
+                } else {
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const rad = radius * (0.85 + Math.random() * 0.3);
+                    x = rad * Math.sin(phi) * Math.cos(theta);
+                    y = rad * Math.sin(phi) * Math.sin(theta);
+                    z = rad * Math.cos(phi);
+                }
+                positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
+                let col;
+                if (isEarthLike) {
+                    const theta2 = Math.atan2(y, x);
+                    const phi2 = Math.acos(z / Math.hypot(x, y, z));
+                    const lat = (Math.PI/2 - phi2) * 180 / Math.PI;
+                    let lon = theta2 * 180 / Math.PI;
+                    if (lon > 180) lon -= 360;
+                    const isLand = (lat > 25 && lat < 75 && ((lon > -20 && lon < 60) || (lon > 60 && lon < 140))) ||
+                                   (lat > -35 && lat < 35 && lon > -20 && lon < 50) ||
+                                   (lat > 15 && lat < 65 && lon > -170 && lon < -60) ||
+                                   (lat > -55 && lat < 15 && lon > -80 && lon < -35) ||
+                                   (lat > -40 && lat < -10 && lon > 110 && lon < 155);
+                    col = isLand ? new THREE.Color(0x44cc44) : new THREE.Color(0x3388ff);
+                } else if (data.isSun) {
+                    const mix = Math.random();
+                    col = new THREE.Color().setHSL(0.12, 1.0, 0.5 + mix * 0.3);
+                } else {
+                    col = new THREE.Color(data.color[0]);
+                    if (data.color.length > 1 && Math.random() < 0.3) col = new THREE.Color(data.color[1]);
+                }
+                colors[i*3] = col.r; colors[i*3+1] = col.g; colors[i*3+2] = col.b;
+            }
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            // Additive на планетах "выжигает" цвет в белый → additive оставляем только для Солнца
+            const material = new THREE.PointsMaterial({
+                size: data.isSun ? 0.34 : 0.30,
+                sizeAttenuation: true,
+                vertexColors: true,
+                blending: data.isSun ? THREE.AdditiveBlending : THREE.NormalBlending,
+                transparent: true,
+                opacity: data.isSun ? 0.85 : 1.0,
+                depthWrite: false,
+                depthTest: true,
+                map: window.__dotMap || null,
+                alphaTest: 0.28
+            });
+            const planet = new THREE.Points(geom, material);
+            // Мягкое свечение без "выжигания": отдельный спрайт вокруг планеты
+            // (сами точки остаются NormalBlending для сохранения цвета).
+            if (!data.isSun && window.__dotMap) {
+                const glowColor = new THREE.Color(data.color?.[0] ?? 0xffffff);
+                const glowMat = new THREE.SpriteMaterial({
+                    map: window.__dotMap,
+                    color: glowColor,
+                    transparent: true,
+                    opacity: 0.10,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const glow = new THREE.Sprite(glowMat);
+                glow.scale.set(radius * 10.5, radius * 10.5, 1);
+                planet.add(glow);
+                planet.userData.__glow = glow;
+            }
+            return planet;
+        }
+        
+        function createMoonQuality(qualityFactor) {
+            if (currentSystem !== "solar") return null;
+            const baseCount = 4000;
+            const count = Math.floor(baseCount * qualityFactor);
+            if (count < 100) return null;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const radius = 1.8;
+            for (let i = 0; i < count; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const rad = radius * (0.8 + Math.random() * 0.4);
+                const x = rad * Math.sin(phi) * Math.cos(theta);
+                const y = rad * Math.sin(phi) * Math.sin(theta);
+                const z = rad * Math.cos(phi);
+                positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
+                const col = new THREE.Color(0xdddddd);
+                colors[i*3] = col.r; colors[i*3+1] = col.g; colors[i*3+2] = col.b;
+            }
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            // Луна тоже без additive, иначе белит и "мылит"
+            const material = new THREE.PointsMaterial({
+                size: 0.26,
+                sizeAttenuation: true,
+                vertexColors: true,
+                blending: THREE.NormalBlending,
+                transparent: true,
+                opacity: 1.0,
+                depthWrite: false,
+                depthTest: true,
+                map: window.__dotMap || null,
+                alphaTest: 0.28
+            });
+            return new THREE.Points(geom, material);
+        }
+        
+        function createStarsQuality(qualityFactor) {
+            const baseCount = 6000;
+            const count = Math.floor(baseCount * Math.min(1, qualityFactor * 1.2));
+            if (count < 200) return null;
+            const starPos = [];
+            for (let i = 0; i < count; i++) {
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const r = 130 + Math.random() * 50;
+                starPos.push(r * Math.sin(phi) * Math.cos(theta));
+                starPos.push(r * Math.sin(phi) * Math.sin(theta));
+                starPos.push(r * Math.cos(phi));
+            }
+            const starGeo = new THREE.BufferGeometry();
+            starGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPos), 3));
+            const starMat = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.20,
+                sizeAttenuation: true,
+                transparent: true,
+                opacity: 0.78,
+                depthWrite: false,
+                depthTest: true,
+                blending: THREE.AdditiveBlending,
+                map: window.__dotMap || null,
+                alphaTest: 0.28
+            });
+            const stars = new THREE.Points(starGeo, starMat);
+            return stars;
+        }
+        
+        function createAuraForStar(planetObj, radius, color) {
+            if (auraGroup) { scene.remove(auraGroup); auraGroup = null; }
+            const group = new THREE.Group();
+            const glowMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.2, side: THREE.BackSide });
+            const innerGlow = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.2, 32, 32), glowMat);
+            const outerGlow = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.6, 32, 32), glowMat);
+            outerGlow.material.opacity = 0.1;
+            group.add(innerGlow); group.add(outerGlow);
+            planetObj.add(group);
+            return group;
+        }
+        
+        function regenerateWithOptions() {
+            const oldAngles = {};
+            for (let name in planets) if (planets[name] && planets[name].userData) oldAngles[name] = planets[name].userData.angle;
+            for (let obj of allObjects) scene.remove(obj);
+            allObjects = []; planets = {};
+            if (moonParticles) scene.remove(moonParticles);
+            if (starField) scene.remove(starField);
+            if (auraGroup && auraGroup.parent) scene.remove(auraGroup);
+            auraGroup = null;
+            
+            starField = createStarsQuality(currentQuality);
+            if (starField) { scene.add(starField); allObjects.push(starField); }
+
+            const orbitGroup = createOrbitRings(currentPlanetsData);
+            if (orbitGroup) { scene.add(orbitGroup); allObjects.push(orbitGroup); }
+            
+            const planetNamesList = [];
+            for (let tpl of currentPlanetsData) {
+                const planet = createPlanet(tpl, currentQuality);
+                if (!planet) continue;
+                let angle = oldAngles[tpl.name] !== undefined ? oldAngles[tpl.name] : Math.random() * Math.PI * 2;
+                const x = Math.cos(angle) * tpl.distance;
+                const z = Math.sin(angle) * tpl.distance;
+                planet.position.set(x, 0, z);
+                planet.userData = { distance: tpl.distance, speed: tpl.speed, angle: angle };
+                scene.add(planet);
+                planets[tpl.name] = planet;
+                targetPositions[tpl.name] = new THREE.Vector3(x, 0, z);
+                allObjects.push(planet);
+                planetNamesList.push(tpl.name);
+                if (tpl.aura) createAuraForStar(planet, tpl.radius, tpl.color[0]);
+            }
+            
+            moonParticles = createMoonQuality(currentQuality);
+            if (moonParticles) {
+                scene.add(moonParticles); allObjects.push(moonParticles);
+                targetPositions["ЛУНА"] = new THREE.Vector3(0,0,0);
+                moonAngle = oldAngles["ЛУНА"] || 0;
+            } else delete targetPositions["ЛУНА"];
+            
+            updatePlanetButtons(planetNamesList);
+            if (!planets[currentTarget] && planetNamesList.length) setTarget(planetNamesList[0]);
+            else if (planets[currentTarget]) document.getElementById('target-name').innerText = currentTarget;
+            applyFrustumCulling();
+            setSystemVisible(systemVisible);
+        }
+
+        function createOrbitRings(planetsData) {
+            const group = new THREE.Group();
+            const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.06 });
+            const seg = 160;
+            for (const p of planetsData) {
+                if (!p.distance || p.distance <= 0) continue;
+                const pts = [];
+                for (let i = 0; i <= seg; i++) {
+                    const a = (i / seg) * Math.PI * 2;
+                    pts.push(new THREE.Vector3(Math.cos(a) * p.distance, 0, Math.sin(a) * p.distance));
+                }
+                const g = new THREE.BufferGeometry().setFromPoints(pts);
+                const line = new THREE.Line(g, mat);
+                line.frustumCulled = frustumCullingEnabled;
+                group.add(line);
+            }
+            return group.children.length ? group : null;
+        }
+        
+        function updatePlanetButtons(planetNamesList) {
+            const container = document.getElementById('planet-buttons');
+            container.innerHTML = '';
+            planetNamesList.forEach(name => {
+                const btn = document.createElement('button');
+                btn.innerText = name;
+                btn.onclick = () => setTarget(name);
+                if (name === currentTarget) btn.classList.add('is-active');
+                container.appendChild(btn);
+            });
+        }
+        
+        function setTarget(name) {
+            if (universeEnded) return;
+            if (isSwitching || !targetPositions[name]) return;
+            // подсветка выбранной цели
+            document.querySelectorAll('#planet-buttons button').forEach(b => {
+                b.classList.toggle('is-active', b.innerText === name);
+            });
+            const idx = currentPlanetsData.findIndex(p => p.name === name);
+            if (idx !== -1) currentTargetIdx = idx;
+            startCamPos = camera.position.clone();
+            endTargetPos = targetPositions[name].clone();
+            startDist = cameraDistance;
+            startPhi = cameraPhi; startTheta = cameraTheta;
+            isSwitching = true; switchTimer = 0;
+            window._pending = name;
+            document.getElementById('target-name').innerText = name;
+            playSwitchSound();
+        }
+        
+        function updateSwitch(dt) {
+            if (!isSwitching) return;
+            switchTimer += dt;
+            let t = Math.min(1, switchTimer / switchDuration);
+            const ease = 1 - Math.pow(1 - t, 3);
+            // цель "живая": планета движется по орбите во время перелёта
+            const liveTarget = targetPositions[window._pending] || endTargetPos;
+            endTargetPos.copy(liveTarget);
+            const newPos = startCamPos.clone().lerp(liveTarget.clone().add(new THREE.Vector3(0, 4, startDist)), ease);
+            camera.position.copy(newPos);
+            cameraPhi = startPhi * (1 - ease);
+            cameraTheta = startTheta * (1 - ease) + 0.6 * ease;
+            camera.lookAt(liveTarget);
+            cameraDistance = startDist;
+            if (t >= 1) {
+                isSwitching = false;
+                currentTarget = window._pending;
+                // синхронизируем углы с фактической позицией камеры — убирает резкий рывок
+                const tp = targetPositions[currentTarget] || liveTarget;
+                const rel = camera.position.clone().sub(tp);
+                rel.y -= 3;
+                const d = Math.max(0.0001, rel.length());
+                cameraDistance = d;
+                cameraTheta = Math.asin(Math.max(-1, Math.min(1, rel.y / d)));
+                cameraPhi = Math.atan2(rel.x, rel.z);
+                currentRot.x = 0; currentRot.y = 0; targetRot.x = 0; targetRot.y = 0;
+                mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
+                touchRotSpeed.x = 0; touchRotSpeed.y = 0;
+            }
+        }
+        
+        function updateOrbits() {
+            if (universeEnded) return;
+            for (let [name, planet] of Object.entries(planets)) {
+                if (!planet.userData) continue;
+                const data = planet.userData;
+                data.angle += data.speed;
+                const x = Math.cos(data.angle) * data.distance;
+                const z = Math.sin(data.angle) * data.distance;
+                planet.position.set(x, 0, z);
+                targetPositions[name].set(x, 0, z);
+            }
+        }
+        
+        function updateMoon() {
+            if (universeEnded) return;
+            if (!moonParticles || !planets["ЗЕМЛЯ"]) return;
+            const earthPos = planets["ЗЕМЛЯ"].position;
+            moonAngle += moonSpeed;
+            const x = earthPos.x + Math.cos(moonAngle) * moonOrbitRadius;
+            const z = earthPos.z + Math.sin(moonAngle) * moonOrbitRadius;
+            const y = earthPos.y;
+            moonParticles.position.set(x, y, z);
+            targetPositions["ЛУНА"].set(x, y, z);
+        }
+        
+        function updateCamera(dt) {
+            if (isSwitching) return;
+            let rotIntensity = 0;
+            let rotX = 0, rotY = 0;
+            
+            if (controlMode === "gesture") {
+                const sens = 2.5;
+                currentRot.x += (targetRot.x * sens - currentRot.x) * 0.2;
+                currentRot.y += (targetRot.y * sens - currentRot.y) * 0.2;
+                rotX = currentRot.x * dt * 1.5;
+                rotY = currentRot.y * dt * 1.2;
+                rotIntensity = Math.sqrt(rotX*rotX + rotY*rotY) * 5;
+                pinch += (targetPinch - pinch) * 0.2;
+                cameraDistance += (targetDistance - cameraDistance) * 0.12;
+            } else if (controlMode === "mouse") {
+                rotX = mouseRotSpeed.x * dt * 1.8;
+                rotY = mouseRotSpeed.y * dt * 1.5;
+                rotIntensity = Math.sqrt(mouseRotSpeed.x*mouseRotSpeed.x + mouseRotSpeed.y*mouseRotSpeed.y) * 2;
+                mouseRotSpeed.x *= 0.95; mouseRotSpeed.y *= 0.95;
+                cameraDistance += (targetDistance - cameraDistance) * 0.12;
+            } else if (controlMode === "touch") {
+                rotX = touchRotSpeed.x * dt * 1.8;
+                rotY = touchRotSpeed.y * dt * 1.5;
+                rotIntensity = Math.sqrt(touchRotSpeed.x*touchRotSpeed.x + touchRotSpeed.y*touchRotSpeed.y) * 2;
+                touchRotSpeed.x *= 0.96; touchRotSpeed.y *= 0.96;
+                cameraDistance += (targetDistance - cameraDistance) * 0.12;
+            }
+            
+            cameraPhi += rotX;
+            cameraTheta += rotY;
+            if (rotIntensity > 0.03) playRotationSound(Math.min(0.8, rotIntensity));
+            
+            cameraTheta = Math.max(0.05, Math.min(Math.PI - 0.05, cameraTheta));
+            cameraDistance = Math.min(Math.max(cameraDistance, 15), 80);
+            const x = Math.sin(cameraPhi) * Math.cos(cameraTheta) * cameraDistance;
+            const y = Math.sin(cameraTheta) * cameraDistance;
+            const z = Math.cos(cameraPhi) * Math.cos(cameraTheta) * cameraDistance;
+            const targetPos = targetPositions[currentTarget];
+            if (targetPos) {
+                camera.position.copy(targetPos.clone().add(new THREE.Vector3(x, y + 3, z)));
+                camera.lookAt(targetPos);
+            }
+        }
+        
+        function updateVisibility(dt) {
+            if (universeEnded) return;
+            if (Math.abs(currentOpacity - targetOpacity) > 0.02) {
+                currentOpacity += (targetOpacity - currentOpacity) * 0.15;
+            } else currentOpacity = targetOpacity;
+            for (let obj of allObjects) if (obj.material) obj.material.opacity = currentOpacity;
+            document.getElementById('visible-indicator').innerText = targetOpacity > 0.5 ? "ДА" : "НЕТ";
+        }
+        
+        function setSystemVisible(visible) {
+            if (universeEnded) return;
+            if (visible === systemVisible) return;
+            systemVisible = visible;
+            targetOpacity = visible ? 1.0 : 0.0;
+        }
+        
+        // ----- ЖЕСТЫ (ТОЛЬКО ДЛЯ РЕЖИМА gesture) -----
+        function isVictoryGesture(lm) {
+            const idxEx = lm[8].y < lm[6].y;
+            const midEx = lm[12].y < lm[10].y;
+            const rinF = lm[16].y > lm[14].y;
+            const pinF = lm[20].y > lm[18].y;
+            const thF = Math.abs(lm[4].x - lm[2].x) < 0.07;
+            return idxEx && midEx && rinF && pinF && thF;
+        }
+        function detectOpenPalmAndFist(lm) {
+            const wrist = lm[0]; let avg = 0, ext = 0;
+            for (let t of [4,8,12,16,20]) {
+                const d = Math.hypot(lm[t].x-wrist.x, lm[t].y-wrist.y);
+                avg += d; if (d>0.22) ext++;
+            }
+            avg /= 5;
+            if (ext>=4 && avg>0.28) return "open";
+            if (ext<=1 && avg<0.18) return "fist";
+            return "unknown";
+        }
+        function nextPlanet() {
+            if (universeEnded) return;
+            const next = (currentTargetIdx + 1) % currentPlanetsData.length;
+            setTarget(currentPlanetsData[next].name);
+            document.getElementById('gesture-name').innerHTML = "✌️ ПОБЕДА";
+            setTimeout(() => { if (document.getElementById('gesture-name').innerHTML === "✌️ ПОБЕДА") document.getElementById('gesture-name').innerHTML = lastDetectedGesture; }, 800);
+        }
+        
+        // ---- Конец вселенной (две ладони) ----
+        function startUniverseEnd() {
+            if (universeEnded) return;
+            universeEnded = true;
+            explosionProgress = 0; explosionTimer = 0;
+            explosionObjects = [];
+            for (let obj of allObjects) {
+                if (obj.geometry && obj.geometry.attributes.position) {
+                    const arr = obj.geometry.attributes.position.array;
+                    const cnt = obj.geometry.attributes.position.count;
+                    for (let i=0;i<cnt;i++) {
+                        const ix = i*3;
+                        const s = new THREE.Vector3(arr[ix], arr[ix+1], arr[ix+2]);
+                        explosionObjects.push({ obj, index: i, startPos: s, targetPos: new THREE.Vector3(0,0,0), velocity: null, done: false });
+                    }
+                }
+            }
+            document.getElementById('gesture-name').innerHTML = "💥 КОНЕЦ ВСЕЛЕННОЙ 💥";
+        }
+        function updateExplosion(dt) {
+            if (!universeEnded) return;
+            explosionTimer += dt;
+            if (explosionProgress===0) {
+                let t = Math.min(1, explosionTimer / explosionDuration);
+                for (let it of explosionObjects) {
+                    if (it.done) continue;
+                    const n = it.startPos.clone().lerp(it.targetPos, t);
+                    const arr = it.obj.geometry.attributes.position.array;
+                    arr[it.index*3] = n.x; arr[it.index*3+1] = n.y; arr[it.index*3+2] = n.z;
+                }
+                if (t>=1) {
+                    explosionProgress = 1; explosionTimer = 0;
+                    for (let it of explosionObjects) {
+                        const dir = new THREE.Vector3((Math.random()-0.5)*2, (Math.random()-0.5)*2, (Math.random()-0.5)*2).normalize();
+                        const sp = 20+Math.random()*30;
+                        it.velocity = dir.multiplyScalar(sp);
+                    }
+                }
+            } else if (explosionProgress===1) {
+                let allGone = true;
+                for (let it of explosionObjects) {
+                    if (it.done) continue;
+                    const arr = it.obj.geometry.attributes.position.array;
+                    const off = it.velocity.clone().multiplyScalar(explosionTimer);
+                    arr[it.index*3] = off.x; arr[it.index*3+1] = off.y; arr[it.index*3+2] = off.z;
+                    if (Math.abs(off.x)>500 && Math.abs(off.y)>500 && Math.abs(off.z)>500) it.done=true;
+                    else allGone=false;
+                }
+                for (let obj of allObjects) if (obj.geometry && obj.geometry.attributes.position) obj.geometry.attributes.position.needsUpdate = true;
+                if (allGone) {
+                    for (let obj of allObjects) scene.remove(obj);
+                    universeEnded = false;
+                    document.getElementById('hand-status').innerHTML = "ВСЕЛЕННАЯ РАЗРУШЕНА";
+                    document.getElementById('gesture-name').innerHTML = "💀 НИЧЕГО НЕ ОСТАЛОСЬ 💀";
+                }
+            }
+            if (explosionProgress===0) for (let obj of allObjects) if (obj.geometry && obj.geometry.attributes.position) obj.geometry.attributes.position.needsUpdate = true;
+        }
+        
+        function applyFrustumCulling() {
+            for (let obj of allObjects) if (obj && obj.isPoints) obj.frustumCulled = frustumCullingEnabled;
+        }
+        
+        function initSettings() {
+            const panel = document.getElementById('settings-panel');
+            const btnSet = document.getElementById('settings-btn');
+            const qualitySel = document.getElementById('quality-select');
+            const systemSel = document.getElementById('system-select');
+            const frustumChk = document.getElementById('frustum-culling');
+            const previewModeSel = document.getElementById('preview-mode');
+            const togglePreview = document.getElementById('toggle-preview');
+            const previewCanvas = document.getElementById('preview-canvas');
+            
+            btnSet.onclick = () => { panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex'; };
+            qualitySel.onchange = (e) => { currentQuality = parseFloat(e.target.value); regenerateWithOptions(); };
+            systemSel.onchange = (e) => {
+                const newSys = e.target.value;
+                if (newSys === currentSystem) return;
+                currentSystem = newSys;
+                currentPlanetsData = systemsData[currentSystem].planets;
+                document.getElementById('hud').style.borderLeftColor = (currentSystem==='solar') ? "#0f0" : "#f80";
+                currentTargetIdx = 0;
+                currentTarget = currentPlanetsData[0].name;
+                regenerateWithOptions();
+            };
+            frustumChk.onchange = (e) => { frustumCullingEnabled = e.target.checked; applyFrustumCulling(); };
+            togglePreview.onchange = (e) => {
+                previewCanvas.style.display = e.target.checked ? "block" : "none";
+            };
+
+            // UX: закрывать настройки по клику вне и по Esc
+            window.addEventListener('pointerdown', (e) => {
+                const isOpen = panel.style.display === 'flex';
+                if (!isOpen) return;
+                const t = e.target;
+                if (t === btnSet || btnSet.contains(t)) return;
+                if (panel.contains(t)) return;
+                panel.style.display = 'none';
+            }, { passive: true });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && panel.style.display === 'flex') panel.style.display = 'none';
+            });
+        }
+        
+        // ----- ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ -----
+        function setControlMode(mode) {
+            controlMode = mode;
+            const modeSpan = document.getElementById('mode-indicator');
+            const modeBtn = document.getElementById('mode-switch');
+            if (mode === "gesture") {
+                modeSpan.innerText = "ЖЕСТЫ";
+                modeBtn.innerText = "🔘 РЕЖИМ: ЖЕСТЫ";
+            } else if (mode === "mouse") {
+                modeSpan.innerText = "МЫШЬ";
+                modeBtn.innerText = "🔘 РЕЖИМ: МЫШЬ";
+            } else {
+                modeSpan.innerText = "СЕНСОР";
+                modeBtn.innerText = "🔘 РЕЖИМ: СЕНСОР";
+            }
+            // Сброс скоростей
+            mouseRotSpeed.x = 0; mouseRotSpeed.y = 0;
+            touchRotSpeed.x = 0; touchRotSpeed.y = 0;
+            currentRot.x = 0; currentRot.y = 0;
+            targetRot.x = 0; targetRot.y = 0;
+        }
+        
+        function cycleMode() {
+            if (controlMode === "gesture") setControlMode("mouse");
+            else if (controlMode === "mouse") setControlMode("touch");
+            else setControlMode("gesture");
+        }
+        
+        // --- Обработчики сенсорного ввода (только для touch-режима)---
+        function onTouchStart(e) {
+            e.preventDefault();
+            if (controlMode !== "touch") return;
+            const touches = e.touches;
+            if (touches.length === 1) {
+                touchActive = true;
+                lastTouchX = touches[0].clientX;
+                lastTouchY = touches[0].clientY;
+            } else if (touches.length === 2) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                touchStartDist = Math.hypot(dx, dy);
+                initialCameraDistance = cameraDistance;
+            }
+        }
+        
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (controlMode !== "touch") return;
+            const touches = e.touches;
+            if (touches.length === 1 && touchActive) {
+                const dx = touches[0].clientX - lastTouchX;
+                const dy = touches[0].clientY - lastTouchY;
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                    touchRotSpeed.x = dx * 0.008;
+                    touchRotSpeed.y = dy * 0.008;
+                    lastTouchX = touches[0].clientX;
+                    lastTouchY = touches[0].clientY;
+                }
+            } else if (touches.length === 2) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                const newDist = Math.hypot(dx, dy);
+                if (touchStartDist > 0) {
+                    const scale = newDist / touchStartDist;
+                    targetDistance = Math.min(Math.max(initialCameraDistance / scale, 15), 80);
+                }
+            }
+        }
+        
+        function onTouchEnd(e) {
+            e.preventDefault();
+            touchActive = false;
+            touchStartDist = 0;
+        }
+        
+        // --- Обработчики мыши ---
+        function onMouseDown(e) { if (controlMode === "mouse") { mouseLeftDown = true; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
+        function onMouseMove(e) { if (controlMode === "mouse" && mouseLeftDown && !universeEnded) { mouseRotSpeed.x = (e.clientX - lastMouseX) * 0.008; mouseRotSpeed.y = (e.clientY - lastMouseY) * 0.008; lastMouseX = e.clientX; lastMouseY = e.clientY; } }
+        function onMouseUp() { mouseLeftDown = false; }
+        function onWheel(e) { if (controlMode === "mouse" && !universeEnded) { targetDistance = Math.min(Math.max(targetDistance + (e.deltaY > 0 ? 2 : -2), 15), 80); e.preventDefault(); } }
+        
+        // --- MediaPipe (ЖЕСТЫ) ---
+        const videoEl = document.getElementById('video-input');
+        const handsPipe = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+        handsPipe.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        
+        let bothHandsOpen = false, bothTimer = 0, victoryCD = 0;
+        const previewCanvas = document.getElementById('preview-canvas');
+        const ctx = previewCanvas.getContext('2d');
+        
+        const HAND_CONNECTIONS = [
+            [0,1],[1,2],[2,3],[3,4],
+            [0,5],[5,6],[6,7],[7,8],
+            [0,9],[9,10],[10,11],[11,12],
+            [0,13],[13,14],[14,15],[15,16],
+            [0,17],[17,18],[18,19],[19,20],
+            [5,9],[9,13],[13,17]
+        ];
+        
+        function drawSkeletonAllHands(landmarksArray) {
+            ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.translate(-previewCanvas.width, 0);
+            for (let idx = 0; idx < landmarksArray.length; idx++) {
+                const landmarks = landmarksArray[idx];
+                const isRightHand = idx === 0;
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = isRightHand ? "#00ff00" : "#33ccff";
+                ctx.fillStyle = isRightHand ? "#ff0000" : "#ffaa33";
+                for (let conn of HAND_CONNECTIONS) {
+                    const p1 = landmarks[conn[0]];
+                    const p2 = landmarks[conn[1]];
+                    if (p1 && p2) {
+                        ctx.beginPath();
+                        ctx.moveTo(p1.x * previewCanvas.width, p1.y * previewCanvas.height);
+                        ctx.lineTo(p2.x * previewCanvas.width, p2.y * previewCanvas.height);
+                        ctx.stroke();
+                    }
+                }
+                for (let lm of landmarks) {
+                    ctx.beginPath();
+                    ctx.arc(lm.x * previewCanvas.width, lm.y * previewCanvas.height, 3, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+                const wrist = landmarks[0];
+                ctx.fillStyle = isRightHand ? "#00ff00" : "#33ccff";
+                ctx.font = "bold 14px monospace";
+                ctx.fillText(isRightHand ? "R" : "L", wrist.x * previewCanvas.width - 15, wrist.y * previewCanvas.height - 10);
+            }
+            ctx.restore();
+        }
+        
+        function drawCameraPreview() {
+            if (videoEl.videoWidth) {
+                ctx.drawImage(videoEl, 0, 0, previewCanvas.width, previewCanvas.height);
+            } else {
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+                ctx.fillStyle = '#0f0';
+                ctx.font = '12px monospace';
+                ctx.fillText('Камера не активна', 20, 40);
+            }
+        }
+        
+        handsPipe.onResults((res) => {
+            const hSpan = document.getElementById('hand-status');
+            const gSpan = document.getElementById('gesture-name');
+            const previewMode = document.getElementById('preview-mode').value;
+            const previewEnabled = document.getElementById('toggle-preview').checked;
+            
+            // Рисование скелета/камеры (всегда, независимо от режима, если включен предпросмотр)
+            if (previewEnabled) {
+                if (previewMode === "skeleton") {
+                    if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+                        drawSkeletonAllHands(res.multiHandLandmarks);
+                    } else {
+                        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+                        ctx.fillStyle = '#0f0';
+                        ctx.font = '12px monospace';
+                        ctx.fillText('Рука не обнаружена', 20, 40);
+                    }
+                } else {
+                    drawCameraPreview();
+                }
+            } else {
+                ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+            }
+            
+            // Обработка жестов ТОЛЬКО в режиме gesture
+            if (controlMode !== "gesture") {
+                hSpan.innerText = controlMode === "mouse" ? "МЫШЬ" : "СЕНСОР";
+                hSpan.style.color = "#888";
+                return;
+            }
+            
+            if (universeEnded) {
+                hSpan.innerText = "КОНЕЦ";
+                hSpan.style.color = "#f00";
+                return;
+            }
+            
+            if (res.multiHandLandmarks && res.multiHandLandmarks.length) {
+                hSpan.innerText = "ЗАХВАЧЕНО";
+                hSpan.style.color = "#0f0";
+                const lm = res.multiHandLandmarks[0];
+                const palm = lm[9];
+                targetRot.x = (palm.x - 0.5) * 1.8;
+                targetRot.y = (palm.y - 0.5) * 1.6;
+                const thumb = lm[4], idx = lm[8];
+                const d = Math.hypot(thumb.x - idx.x, thumb.y - idx.y);
+                let p = 0;
+                if (d < 0.05) p = 1;
+                else if (d > 0.15) p = 0;
+                else p = 1 - (d - 0.05) / 0.1;
+                targetDistance = 55 - p * 40;
+                targetDistance = Math.min(Math.max(targetDistance, 15), 80);
+                
+                const now = Date.now();
+                const victory = isVictoryGesture(lm);
+                const pf = detectOpenPalmAndFist(lm);
+                let gdisp = "—";
+                
+                if (victory && now - victoryCD > 700) {
+                    nextPlanet();
+                    victoryCD = now;
+                    gdisp = "✌️ ПОБЕДА";
+                } else if (pf === "open") {
+                    gdisp = "🖐️ ЛАДОНЬ";
+                    if (lastDetectedGesture !== "open" && now - lastGestureTime > 400) {
+                        setSystemVisible(true);
+                        lastGestureTime = now;
+                    }
+                } else if (pf === "fist") {
+                    gdisp = "✊ КУЛАК";
+                    if (lastDetectedGesture !== "fist" && now - lastGestureTime > 400) {
+                        setSystemVisible(false);
+                        lastGestureTime = now;
+                    }
+                } else {
+                    gdisp = "🤷 НЕПОНЯТНО";
+                }
+                lastDetectedGesture = gdisp;
+                gSpan.innerText = gdisp;
+                
+                // Две раскрытые ладони – конец вселенной
+                if (res.multiHandLandmarks.length >= 2) {
+                    const g1 = detectOpenPalmAndFist(res.multiHandLandmarks[0]);
+                    const g2 = detectOpenPalmAndFist(res.multiHandLandmarks[1]);
+                    if (g1 === "open" && g2 === "open") {
+                        if (!bothHandsOpen) {
+                            bothHandsOpen = true;
+                            bothTimer = now;
+                        }
+                        if (now - bothTimer > 500 && !universeEnded) {
+                            startUniverseEnd();
+                            gSpan.innerHTML = "💥 ДВЕ ЛАДОНИ → КОНЕЦ 💥";
+                            hSpan.innerHTML = "АКТИВАЦИЯ";
+                        }
+                    } else {
+                        bothHandsOpen = false;
+                    }
+                }
+            } else {
+                hSpan.innerText = "ПОИСК...";
+                hSpan.style.color = "#f66";
+                targetRot.x = 0;
+                targetRot.y = 0;
+                gSpan.innerText = "—";
+                lastDetectedGesture = "none";
+                victoryCD = 0;
+            }
+        });
+        
+        const cameraUtils = new Camera(videoEl, { onFrame: async () => await handsPipe.send({image:videoEl}), width:640, height:480 });
+        cameraUtils.start();
+        
+        // --- Полноэкранный режим ---
+        const fullBtn = document.getElementById('fullscreen-btn');
+        fullBtn.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                fullBtn.style.opacity = '0.5';
+            } else {
+                document.exitFullscreen();
+                fullBtn.style.opacity = '1';
+            }
+        });
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) fullBtn.style.opacity = '1';
+        });
+        
+        // --- Кнопка переключения режимов ---
+        document.getElementById('mode-switch').addEventListener('click', cycleMode);
+        
+        // --- Инициализация ---
+        async function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x030318);
+            scene.fog = new THREE.FogExp2(0x030318, 0.0003);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 20, cameraDistance);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            window.__dotMap = createDotTexture();
+            currentPlanetsData = systemsData.solar.planets;
+            currentTarget = currentPlanetsData[0].name;
+            regenerateWithOptions();
+            initSettings();
+            
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+            renderer.domElement.addEventListener('wheel', onWheel);
+            renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+            renderer.domElement.addEventListener('touchend', onTouchEnd);
+            renderer.domElement.addEventListener('touchcancel', onTouchEnd);
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            let last = performance.now();
+            function animate() {
+                const now = performance.now();
+                let dt = Math.min(0.033, (now - last) / 1000);
+                last = now;
+                if (!universeEnded) {
+                    updateOrbits();
+                    updateMoon();
+                    updateSwitch(dt);
+                    updateCamera(dt);
+                    updateVisibility(dt);
+                    if (starField) starField.rotation.y += dt * 0.01;
+                } else {
+                    updateExplosion(dt);
+                }
+                renderer.render(scene, camera);
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+        init();
+    </script>
+</body>
+</html>

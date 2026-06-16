@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="SolarBoss — интерактивная 3D Солнечная система и галактика Андромеда. Управление жестами, мышью и сенсором.">
+  <title>SolarBoss — Космос в твоих руках</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+      (function(m,e,t,r,i,k,a){
+          m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+          m[i].l=1*new Date();
+          for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+          k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+      })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=109886442', 'ym');
+
+      ym(109886442, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+  </script>
+  <noscript><div><img src="https://mc.yandex.ru/watch/109886442" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+  <!-- /Yandex.Metrika counter -->
+</head>
+<body>
+  <div id="preloader">
+    <div class="preloader-inner">
+      <div class="preloader-sun"></div>
+      <div class="preloader-logo">SOLARBOSS</div>
+      <div class="preloader-bar"><span></span></div>
+      <p class="preloader-text">Загрузка космоса...</p>
+    </div>
+  </div>
+
+  <canvas id="particles"></canvas>
+  <canvas id="particles-deep"></canvas>
+  <canvas id="shooting-stars"></canvas>
+  <div id="ambient-bg" aria-hidden="true">
+    <div class="ambient-base"></div>
+    <div class="ambient-glow"></div>
+    <div class="ambient-rays"></div>
+  </div>
+  <div class="ambient-vignette" aria-hidden="true"></div>
+  <div class="ambient-grain" aria-hidden="true"></div>
+  <div class="film-letterbox" aria-hidden="true"><span></span><span></span></div>
+
+  <div id="fullscreen-gate" class="fullscreen-gate">
+    <div class="gate-inner">
+      <div class="gate-sun"></div>
+      <p class="gate-eyebrow">SOLARBOSS · PREMIUM EXPERIENCE</p>
+      <h2 class="gate-title">Погрузись в космос</h2>
+      <p class="gate-text">Полноэкранный режим для максимального эффекта</p>
+      <button type="button" class="gate-btn" id="enter-fullscreen">Войти на весь экран</button>
+      <span class="gate-hint">или нажмите F11</span>
+    </div>
+  </div>
+
+  <nav class="nav-dots" aria-label="Навигация по разделам"></nav>
+  <div class="progress-bar"><div class="progress-fill"></div></div>
+
+  <header class="top-bar">
+    <a href="#hero" class="logo" data-goto="hero">
+      <span class="logo-sun"></span>
+      <span class="logo-text">SOLARBOSS</span>
+    </a>
+    <button class="menu-toggle" aria-label="Открыть меню">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <aside class="side-menu">
+    <div class="side-menu-header">
+      <span>SOLARBOSS</span>
+      <button class="menu-close" aria-label="Закрыть">&times;</button>
+    </div>
+    <p class="side-menu-tagline">Космос в твоих руках</p>
+    <ul class="menu-list"></ul>
+    <a href="https://solarboss.ru" class="menu-cta" target="_blank" rel="noopener">
+      Запустить приложение →
+    </a>
+    <div class="menu-hint">↑ ↓ или колесо мыши</div>
+  </aside>
+
+  <main id="landing">
+    <!-- HERO -->
+    <section class="slide slide-hero" id="hero" data-title="Главная"
+      data-color-top="#1c0d02" data-color-mid="#120a18" data-color-bottom="#050810" data-glow="255,140,40">
+      <div class="hero-orbit" aria-hidden="true">
+        <div class="orbit-ring ring-1"><span class="planet p1"></span></div>
+        <div class="orbit-ring ring-2"><span class="planet p2"></span></div>
+        <div class="orbit-ring ring-3"><span class="planet p3"></span></div>
+        <div class="hero-sun-core"></div>
+      </div>
+      <div class="slide-content hero-content">
+        <div class="hero-badge reveal">
+          <span class="badge-pulse"></span>
+          <span class="badge-text">Live · solarboss.ru</span>
+        </div>
+        <p class="eyebrow reveal">3D · Жесты · Браузер</p>
+        <h1 class="hero-title">
+          <span class="line"><span>SOLAR</span></span>
+          <span class="line accent"><span>BOSS</span></span>
+        </h1>
+        <p class="hero-sub reveal">Интерактивная Солнечная система и галактика Андромеда прямо в браузере. Управляй космосом ладонью, мышью или касанием.</p>
+        <div class="hero-actions reveal">
+          <a href="https://solarboss.ru" class="btn btn-primary" target="_blank" rel="noopener">Запустить космос</a>
+          <button class="btn btn-ghost" data-goto="gestures">Как управлять</button>
+        </div>
+        <div class="hero-stats reveal">
+          <div class="stat stat-highlight">
+            <span class="stat-num" id="visit-counter" data-locale="true" data-count="0">—</span>
+            <span class="stat-label">посещений в месяц</span>
+          </div>
+          <div class="stat"><span class="stat-num" data-count="8">0</span><span class="stat-label">планет</span></div>
+          <div class="stat"><span class="stat-num" data-count="3">0</span><span class="stat-label">способа управления</span></div>
+          <div class="stat"><span class="stat-num" data-count="2">0</span><span class="stat-label">космические системы</span></div>
+        </div>
+      </div>
+      <div class="scroll-hint">
+        <span>Листайте</span>
+        <div class="scroll-mouse"></div>
+      </div>
+    </section>
+
+    <!-- ABOUT -->
+    <section class="slide slide-about" data-title="О проекте"
+      data-color-top="#0a1428" data-color-mid="#08101e" data-color-bottom="#050810" data-glow="76,201,240">
+      <div class="slide-content">
+        <p class="section-tag reveal">Что это</p>
+        <h2 class="section-title reveal">Космос, который <em>чувствуешь</em></h2>
+        <p class="section-desc reveal">SolarBoss — веб-приложение с полноэкранной 3D-сценой. Исследуй орбиты планет, переключайся между Солнечной системой и Андромедой, настраивай качество и звук под своё устройство.</p>
+        <div class="feature-grid">
+          <article class="feature-card reveal">
+            <span class="feature-icon">🌐</span>
+            <h3>В браузере</h3>
+            <p>Без установки. Открыл solarboss.ru — и ты уже в космосе.</p>
+          </article>
+          <article class="feature-card reveal">
+            <span class="feature-icon">📱</span>
+            <h3>Любое устройство</h3>
+            <p>Десктоп, планшет, телефон — мышь, сенсор или камера.</p>
+          </article>
+          <article class="feature-card reveal">
+            <span class="feature-icon">⚡</span>
+            <h3>Настраиваемо</h3>
+            <p>4 уровня качества частиц — от максимума до экономного режима.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- GESTURES -->
+    <section class="slide slide-gestures" data-title="Жесты"
+      data-color-top="#0c0a1a" data-color-mid="#0a1020" data-color-bottom="#050810" data-glow="157,78,221">
+      <div class="slide-content">
+        <p class="section-tag reveal">Управление</p>
+        <h2 class="section-title reveal">Три жеста — <em>полный контроль</em></h2>
+        <p class="section-desc reveal">Включи камеру и управляй космосом руками. Распознавание жестов работает в реальном времени.</p>
+        <div class="gesture-cards">
+          <article class="gesture-card reveal" data-gesture="palm">
+            <div class="gesture-visual">🖐️</div>
+            <h3>Ладонь</h3>
+            <p>Показать панель и интерфейс</p>
+            <span class="gesture-badge">ПОКАЗАТЬ</span>
+          </article>
+          <article class="gesture-card reveal" data-gesture="fist">
+            <div class="gesture-visual">✊</div>
+            <h3>Кулак</h3>
+            <p>Скрыть панель — чистый обзор</p>
+            <span class="gesture-badge">СКРЫТЬ</span>
+          </article>
+          <article class="gesture-card reveal" data-gesture="victory">
+            <div class="gesture-visual">✌️</div>
+            <h3>Победа</h3>
+            <p>Следующая планета по орбите</p>
+            <span class="gesture-badge">ДАЛЬШЕ</span>
+          </article>
+        </div>
+        <p class="gesture-note reveal">Также доступны мышь и сенсорный экран — выбирай удобный режим в настройках.</p>
+      </div>
+    </section>
+
+    <!-- SOLAR -->
+    <section class="slide slide-solar" data-title="Солнце"
+      data-color-top="#1a1005" data-color-mid="#0f1525" data-color-bottom="#050810" data-glow="255,159,28">
+      <div class="slide-content solar-layout">
+        <div class="solar-text">
+          <p class="section-tag reveal">Режим I</p>
+          <h2 class="section-title reveal">Солнечная <em>система</em></h2>
+          <p class="section-desc reveal">Восемь планет вокруг Солнца. Орбиты, масштаб, детализация — всё в одной сцене. Наблюдай за движением миров от Меркурия до Нептуна.</p>
+          <ul class="planet-list reveal">
+            <li><span class="dot mercury"></span>Меркурий · Венера · Земля · Марс</li>
+            <li><span class="dot jupiter"></span>Юпитер · Сатурн · Уран · Нептун</li>
+          </ul>
+        </div>
+        <div class="solar-visual reveal">
+          <div class="solar-system-demo">
+            <div class="ssd-sun"></div>
+            <div class="ssd-orbit o1"><i></i></div>
+            <div class="ssd-orbit o2"><i></i></div>
+            <div class="ssd-orbit o3"><i></i></div>
+            <div class="ssd-orbit o4"><i></i></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANDROMEDA -->
+    <section class="slide slide-andromeda" data-title="Андромеда"
+      data-color-top="#12081f" data-color-mid="#0a0e22" data-color-bottom="#050810" data-glow="157,78,221">
+      <div class="andromeda-bg" aria-hidden="true"></div>
+      <div class="slide-content">
+        <p class="section-tag reveal">Режим II</p>
+        <h2 class="section-title reveal">Галактика <em>Андромеда</em></h2>
+        <p class="section-desc reveal">Переключись с планет на масштаб галактики. M31 — ближайший к Млечному Пути спиральный гигант, в 2.5 миллиона световых лет от нас.</p>
+        <div class="andromeda-facts reveal">
+          <div class="afact"><strong>2.5M</strong><span>световых лет</span></div>
+          <div class="afact"><strong>1T+</strong><span>звёзд</span></div>
+          <div class="afact"><strong>220K</strong><span>св. лет в диаметре</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="slide slide-features" data-title="Возможности"
+      data-color-top="#0a1220" data-color-mid="#0c1018" data-color-bottom="#050810" data-glow="76,201,240">
+      <div class="slide-content">
+        <p class="section-tag reveal">Интерфейс</p>
+        <h2 class="section-title reveal">Всё под <em>контролем</em></h2>
+        <p class="section-desc reveal">Полноэкранный режим, настройки качества, предпросмотр камеры и звук — всё в одной панели.</p>
+        <div class="settings-grid">
+          <div class="setting-item reveal">
+            <span>⛶</span>
+            <div><strong>Полный экран</strong><p>Погружение без рамок браузера</p></div>
+          </div>
+          <div class="setting-item reveal">
+            <span>🎚️</span>
+            <div><strong>Качество частиц</strong><p>Максимум · Высокое · Среднее · Низкое</p></div>
+          </div>
+          <div class="setting-item reveal">
+            <span>📷</span>
+            <div><strong>Предпросмотр рук</strong><p>Скелет или вся камера</p></div>
+          </div>
+          <div class="setting-item reveal">
+            <span>🔊</span>
+            <div><strong>Звук космоса</strong><p>Включить или выключить атмосферу</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="slide slide-cta" data-title="Запуск"
+      data-color-top="#1a0800" data-color-mid="#100818" data-color-bottom="#050810" data-glow="255,107,53">
+      <div class="cta-glow" aria-hidden="true"></div>
+      <div class="slide-content finale-content">
+        <h2 class="finale-title reveal">
+          <span>ГОТОВ</span>
+          <span class="accent">К ПОЛЁТУ?</span>
+        </h2>
+        <p class="finale-sub reveal">Открой solarboss.ru и стань боссом своей вселенной.</p>
+        <a href="https://solarboss.ru" class="btn btn-primary btn-lg reveal" target="_blank" rel="noopener">Перейти на solarboss.ru</a>
+        <button class="btn btn-ghost reveal" id="restart-btn">Вернуться в начало</button>
+        <p class="finale-credit reveal">solarboss.ru — интерактивный космос</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="keyboard-hint">← → ↑ ↓ навигация · Esc меню</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://unpkg.com/lenis@1.1.18/dist/lenis.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

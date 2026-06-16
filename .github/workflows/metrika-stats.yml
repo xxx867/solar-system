@@ -1,0 +1,42 @@
+name: Update Metrika stats.json
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *" # every hour
+
+permissions:
+  contents: write
+
+concurrency:
+  group: metrika-stats
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Update stats.json from Metrika API
+        env:
+          METRIKA_OAUTH_TOKEN: ${{ secrets.METRIKA_OAUTH_TOKEN }}
+          METRIKA_COUNTER_ID: "109886442"
+        run: node scripts/update_metrika_stats.mjs
+
+      - name: Commit and push
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git add stats.json solarboss-landing/stats.json || true
+          git commit -m "chore: update metrika stats"
+          git push
+
